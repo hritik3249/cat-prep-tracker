@@ -354,13 +354,22 @@ function PomodoroTimer() {
   const [settings, setSettings] = useState(DEFAULT);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(DEFAULT);
-  const [mode, setMode] = useState("work"); // work | shortBreak | longBreak
+  const [mode, setMode] = useState("work");
   const [secondsLeft, setSecondsLeft] = useState(DEFAULT.work * 60);
   const [running, setRunning] = useState(false);
   const [round, setRound] = useState(1);
   const [sessionsToday, setSessionsToday] = useState(0);
   const intervalRef = useRef(null);
   const audioCtx = useRef(null);
+  const autoAdvanceRef = useRef(null); // stores next state to apply after session ends
+  const settingsRef = useRef(DEFAULT);
+  const roundRef = useRef(1);
+  const modeRef = useRef("work");
+
+  // Keep refs in sync with state
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { roundRef.current = round; }, [round]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   const modeLabels = { work: "FOCUS", shortBreak: "SHORT BREAK", longBreak: "LONG BREAK" };
   const modeColors = { work: "#E8532A", shortBreak: "#2AAF6F", longBreak: "#4A90D9" };
@@ -383,6 +392,20 @@ function PomodoroTimer() {
     } catch(e) {}
   };
 
+  // Auto-advance effect: triggers when running turns false and autoAdvanceRef has a pending transition
+  useEffect(() => {
+    if (!running && autoAdvanceRef.current) {
+      const { nextMode, nextSeconds, nextRound, addSession } = autoAdvanceRef.current;
+      autoAdvanceRef.current = null;
+      if (addSession) setSessionsToday(n => n + 1);
+      if (nextRound !== undefined) setRound(nextRound);
+      setMode(nextMode);
+      setSecondsLeft(nextSeconds);
+      // Small delay so state settles, then auto-start
+      setTimeout(() => setRunning(true), 200);
+    }
+  }, [running]);
+
   useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => {
@@ -390,27 +413,19 @@ function PomodoroTimer() {
           if (s <= 1) {
             clearInterval(intervalRef.current);
             playBeep();
-            // Auto-advance mode AND auto-start next session
-            setMode(prev => {
-              if (prev === "work") {
-                setSessionsToday(n => n + 1);
-                if (round >= settings.rounds) {
-                  setRound(1);
-                  setSecondsLeft(settings.longBreak * 60);
-                  setTimeout(() => setRunning(true), 100);
-                  return "longBreak";
-                } else {
-                  setRound(r => r + 1);
-                  setSecondsLeft(settings.shortBreak * 60);
-                  setTimeout(() => setRunning(true), 100);
-                  return "shortBreak";
-                }
+            const s = settingsRef.current;
+            const r = roundRef.current;
+            const m = modeRef.current;
+            if (m === "work") {
+              if (r >= s.rounds) {
+                autoAdvanceRef.current = { nextMode: "longBreak", nextSeconds: s.longBreak * 60, nextRound: 1, addSession: true };
               } else {
-                setSecondsLeft(settings.work * 60);
-                setTimeout(() => setRunning(true), 100);
-                return "work";
+                autoAdvanceRef.current = { nextMode: "shortBreak", nextSeconds: s.shortBreak * 60, nextRound: r + 1, addSession: true };
               }
-            });
+            } else {
+              autoAdvanceRef.current = { nextMode: "work", nextSeconds: s.work * 60, addSession: false };
+            }
+            setRunning(false);
             return 0;
           }
           return s - 1;
@@ -420,7 +435,7 @@ function PomodoroTimer() {
       clearInterval(intervalRef.current);
     }
     return () => clearInterval(intervalRef.current);
-  }, [running, settings, round]);
+  }, [running]);
 
   const switchMode = (m) => {
     setRunning(false);
