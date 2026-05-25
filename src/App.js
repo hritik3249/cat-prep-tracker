@@ -389,24 +389,25 @@ function PomodoroTimer() {
         setSecondsLeft(s => {
           if (s <= 1) {
             clearInterval(intervalRef.current);
-            setRunning(false);
             playBeep();
-            // Auto-advance mode
+            // Auto-advance mode AND auto-start next session
             setMode(prev => {
               if (prev === "work") {
                 setSessionsToday(n => n + 1);
-                setRound(r => {
-                  const next = r + 1;
-                  if (next > settings.rounds) {
-                    setSecondsLeft(settings.longBreak * 60);
-                    return 1;
-                  }
+                if (round >= settings.rounds) {
+                  setRound(1);
+                  setSecondsLeft(settings.longBreak * 60);
+                  setTimeout(() => setRunning(true), 100);
+                  return "longBreak";
+                } else {
+                  setRound(r => r + 1);
                   setSecondsLeft(settings.shortBreak * 60);
-                  return next;
-                });
-                return round >= settings.rounds ? "longBreak" : "shortBreak";
+                  setTimeout(() => setRunning(true), 100);
+                  return "shortBreak";
+                }
               } else {
                 setSecondsLeft(settings.work * 60);
+                setTimeout(() => setRunning(true), 100);
                 return "work";
               }
             });
