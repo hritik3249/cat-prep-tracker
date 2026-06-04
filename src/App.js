@@ -926,7 +926,38 @@ export default function CATPrep() {
                                           defaultValue={displayTime}
                                           onBlur={e => {
                                             const val = e.target.value.trim();
-                                            if (val) setCustomTimes(prev => ({ ...prev, [timeKey]: val }));
+                                            if (val) {
+                                              setCustomTimes(prev => ({ ...prev, [timeKey]: val }));
+                                              // Auto-reorder: parse start hour from time string and sort
+                                              const parseHour = (str) => {
+                                                const m = str.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+                                                if (!m) return 9999;
+                                                let h = parseInt(m[1]);
+                                                const min = parseInt(m[2]);
+                                                const ampm = (m[3]||"").toUpperCase();
+                                                if (ampm === "PM" && h !== 12) h += 12;
+                                                if (ampm === "AM" && h === 12) h = 0;
+                                                return h * 60 + min;
+                                              };
+                                              // Rebuild order after slight delay so customTimes state is updated
+                                              setTimeout(() => {
+                                                setCustomTimes(prev => {
+                                                  const updated = { ...prev, [timeKey]: val };
+                                                  // Get all tasks for this day with their effective times
+                                                  const wD = data.weeklyPlan.find(w => w.week === wData.week);
+                                                  if (!wD) return updated;
+                                                  const base = getDailyTasks(wD)[day] || [];
+                                                  // Build list of { origIdx, effectiveTime }
+                                                  const ordered = base.map((t, idx) => {
+                                                    const tKey = `${wData.week}-${day}-${idx}`;
+                                                    return { origIdx: idx, timeStr: updated[tKey] || t.time };
+                                                  });
+                                                  ordered.sort((a, b) => parseHour(a.timeStr) - parseHour(b.timeStr));
+                                                  setTaskOrders(prev2 => ({ ...prev2, [`${wData.week}-${day}`]: ordered.map(x => x.origIdx) }));
+                                                  return updated;
+                                                });
+                                              }, 0);
+                                            }
                                             setEditingTime(null);
                                           }}
                                           onKeyDown={e => {
@@ -940,7 +971,7 @@ export default function CATPrep() {
                                         <div
                                           onClick={e => { e.stopPropagation(); if (!isBreak) setEditingTime(timeKey); }}
                                           title={isBreak ? "" : "Click to edit time"}
-                                          style={{ width:"100%", padding:"10px 8px", fontFamily:"monospace", fontSize:"10px", color: customTimes[timeKey] ? "#CCC" : "#383838", lineHeight:1.3, cursor: isBreak ? "default" : "text", display:"flex", alignItems:"center", gap:"4px" }}
+                                          style={{ width:"100%", padding:"10px 8px", fontFamily:"monospace", fontSize:"10px", color: isDone ? "#333" : isBreak ? "#444" : "#CCC", lineHeight:1.3, cursor: isBreak ? "default" : "text", display:"flex", alignItems:"center", gap:"4px" }}
                                         >
                                           <span style={{ flex:1 }}>{displayTime}</span>
                                           {!isBreak && <span style={{ color:"#2A2A2A", fontSize:"8px", opacity:0.6 }}>✎</span>}
