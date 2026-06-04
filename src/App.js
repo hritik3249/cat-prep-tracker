@@ -290,6 +290,7 @@ const tagColors = {
 };
 
 // ─── DAILY TASKS GENERATOR ───────────────────────────────────────────────────
+// Each task is { time, activity, tag } matching the daily routine schedule
 
 function getDailyTasks(w) {
   const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
@@ -307,39 +308,77 @@ function getDailyTasks(w) {
       (day==="Friday"&&w.mock.includes("Quant Fri"))||
       (day==="Sunday"&&(w.mock.includes("sectional")||w.mock.includes("Sectional")))
     );
-    const t = [];
+
+    let t = [];
+
     if (isTaper) {
-      if (i===0){t.push("Read editorial (The Hindu)");t.push("Formula sheet revision — 15 min only");t.push("10 easy Quant Qs — confidence only, no hard problems");t.push("2 RCs light reading — no timer, no pressure");}
-      else if (i===1){t.push("Read editorial");t.push("Formula sheet revision — 15 min only");t.push("5 VA questions only");t.push("1 LRDI set from your strongest type");}
-      else {t.push("Read editorial only — no solving");t.push("Review strategy notes: section attempt order, set selection plan");t.push("Rest. Sleep 8 hours. No CAT content.");}
+      if (i===0) {
+        t = [
+          { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast", tag:"break" },
+          { time:"11:30 AM–12:00 PM", activity:"Read editorial (The Hindu) — light, no pressure", tag:"VARC" },
+          { time:"12:00–12:30 PM", activity:"Formula sheet revision — 15 min only", tag:"revision" },
+          { time:"12:30–1:30 PM", activity:"10 easy Quant Qs — confidence only, no hard problems", tag:"Quant" },
+          { time:"1:30–2:30 PM", activity:"2 RCs light reading — no timer, no score pressure", tag:"VARC" },
+          { time:"2:30 PM onwards", activity:"Rest. No more CAT content today.", tag:"break" },
+        ];
+      } else if (i===1) {
+        t = [
+          { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast", tag:"break" },
+          { time:"11:30 AM–12:00 PM", activity:"Read editorial — light reading only", tag:"VARC" },
+          { time:"12:00–12:30 PM", activity:"Formula sheet revision — 15 min only", tag:"revision" },
+          { time:"12:30–1:00 PM", activity:"5 VA questions only — no drilling", tag:"VARC" },
+          { time:"1:00–1:30 PM", activity:"1 LRDI set from your strongest type — confidence", tag:"LRDI" },
+          { time:"1:30 PM onwards", activity:"Rest. Sleep 8 hours tonight.", tag:"break" },
+        ];
+      } else {
+        t = [
+          { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast", tag:"break" },
+          { time:"11:30 AM–12:00 PM", activity:"Read editorial only — no solving whatsoever", tag:"VARC" },
+          { time:"12:00–12:30 PM", activity:"Review strategy notes: section attempt order, set selection plan", tag:"revision" },
+          { time:"12:30 PM onwards", activity:"Rest. Sleep 8 hours. No CAT content.", tag:"break" },
+        ];
+      }
     } else if (isMockDay) {
-      t.push("Read editorial (The Hindu) — morning routine");
-      t.push("Full mock at 11:30 AM — strict 2-hour timer, phone off, rough paper ready");
-      t.push("30 min rest after mock — do not start analysis yet");
-      t.push("Mock analysis Hour 1: score breakdown — attempted / correct / incorrect / accuracy % per section");
-      t.push("Mock analysis Hour 2: re-solve every wrong Q without timer, classify error type A/B/C/D");
-      t.push("Mock analysis Hour 3: update error log, identify 1 dominant pattern per section");
-      t.push("Write down 1 specific process target for next mock");
+      t = [
+        { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast + editorial read", tag:"break" },
+        { time:"11:30 AM–1:30 PM", activity:"Full mock — strict 2-hour timer, phone off, rough paper ready", tag:"mock" },
+        { time:"1:30–2:00 PM", activity:"Rest after mock — do not start analysis yet", tag:"break" },
+        { time:"2:00–3:00 PM", activity:"Mock analysis Hour 1: score breakdown — attempted / correct / incorrect / accuracy % per section", tag:"revision" },
+        { time:"3:00–4:00 PM", activity:"Mock analysis Hour 2: re-solve every wrong Q without timer, classify error type A/B/C/D", tag:"revision" },
+        { time:"4:00–5:00 PM", activity:"Mock analysis Hour 3: update error log, identify 1 dominant pattern per section", tag:"revision" },
+        { time:"5:00–5:30 PM", activity:"Write down 1 specific process target for next mock", tag:"revision" },
+        { time:"5:30 PM onwards", activity:"Completely off — no more CAT content", tag:"break" },
+      ];
     } else if (isSectionalDay) {
-      t.push("Read editorial (The Hindu) — morning routine");
-      t.push("Sectional mock — 40 min strict timer, no pausing");
-      t.push("1.5-hour sectional analysis: mark every wrong answer with error type");
-      t.push("Update error log from today's sectional");
-      t.push("VARC: " + w.varc.questions);
-      t.push("Quant: " + w.quant.questions);
-      t.push("Formula sheet revision — 5 min");
-      t.push("Update daily tracker");
+      t = [
+        { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast + editorial read", tag:"break" },
+        { time:"11:30 AM–12:10 PM", activity:"Sectional mock — 40 min strict timer, no pausing", tag:"mock" },
+        { time:"12:10–1:40 PM", activity:"1.5-hour sectional analysis: mark every wrong answer with error type", tag:"revision" },
+        { time:"1:40–2:00 PM", activity:"Update error log from today's sectional", tag:"revision" },
+        { time:"2:00–3:00 PM", activity:"Lunch + rest", tag:"break" },
+        { time:"3:00–4:00 PM", activity:"VARC: " + w.varc.questions, tag:"VARC" },
+        { time:"4:00–5:00 PM", activity:"Quant: " + w.quant.questions, tag:"Quant" },
+        { time:"5:00–5:30 PM", activity:"Formula sheet revision — 5 min + update daily tracker", tag:"revision" },
+      ];
     } else {
-      t.push("Read 1 editorial — The Hindu or Economist (15 min, untimed)");
-      t.push("Quant: " + w.quant.questions);
-      t.push("Quant concept today: " + w.quant.topics[i % w.quant.topics.length]);
-      t.push("VARC: " + w.varc.questions);
-      t.push("VARC review: 1-line explanation for every wrong answer — why is it wrong, not just what is correct");
-      t.push("LRDI: " + w.lrdi.questions);
-      t.push("LRDI review: 15 min — where did you slow down? What entry point did you miss?");
-      t.push("Error log: redo yesterday's flagged wrong questions cold (no solutions)");
-      t.push("Formula sheet revision — 5 min, non-negotiable daily");
-      t.push("Update daily tracker: Qs done, accuracy %, topics covered");
+      t = [
+        { time:"11:00–11:30 AM", activity:"Post-gym wind down + shower + breakfast. Read 1 editorial while eating — untimed", tag:"VARC" },
+        { time:"11:30 AM–12:30 PM", activity:"VARC: " + w.varc.questions, tag:"VARC" },
+        { time:"12:30–1:00 PM", activity:"VARC review: 1-line explanation for every wrong answer — why wrong, not just what is correct", tag:"VARC" },
+        { time:"1:00–2:00 PM", activity:"Quant: " + w.quant.questions, tag:"Quant" },
+        { time:"2:00–3:00 PM", activity:"Lunch + rest — full mental break, no content", tag:"break" },
+        { time:"3:00–4:00 PM", activity:"LRDI: " + w.lrdi.questions, tag:"LRDI" },
+        { time:"4:00–4:15 PM", activity:"Break", tag:"break" },
+        { time:"4:15–5:15 PM", activity:"Quant concept: " + w.quant.topics[i % w.quant.topics.length], tag:"concept" },
+        { time:"5:15–5:30 PM", activity:"Break", tag:"break" },
+        { time:"5:30–6:30 PM", activity:"Error log: redo yesterday's flagged wrong questions cold (no solutions)", tag:"revision" },
+        { time:"6:30–7:30 PM", activity:"Drill session: 25 questions from this week's topic focus, timed", tag:"drill" },
+        { time:"7:30–8:00 PM", activity:"Formula sheet revision — 5 min + update error log + daily tracker", tag:"revision" },
+        { time:"8:00–9:00 PM", activity:"Dinner + disconnect completely", tag:"break" },
+        { time:"9:00–10:00 PM", activity:"VARC: 1 additional RC or VA drill + speed reading practice (250 wpm target)", tag:"VARC" },
+        { time:"10:00–10:30 PM", activity:"Watch 1 concept video on tomorrow's topic — no heavy solving", tag:"concept" },
+        { time:"10:30 PM", activity:"Stop. Sleep by 11 PM — 8 hrs before gym. Non-negotiable.", tag:"break" },
+      ];
     }
     tasks[day] = t;
   });
@@ -811,26 +850,44 @@ export default function CATPrep() {
                     const tasks = dailyTasks[day]||[];
                     const done = tasks.filter((_,ti)=>checkedTasks[`${wData.week}-${day}-${ti}`]).length;
                     const dc = dayColors[day];
+                    const isMockD = tasks.some(t=>t.tag==="mock"&&t.activity.includes("Full mock"));
+                    const isSectD = tasks.some(t=>t.tag==="mock"&&t.activity.includes("Sectional"));
                     return (
                       <div key={day} style={{ background:"#141414", border:"1px solid #1A1A1A", borderLeft:`3px solid ${dc}`, marginBottom:"12px" }}>
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", background:"#0F0F0F", borderBottom:"1px solid #1A1A1A" }}>
                           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                             <span style={{ color:dc, fontFamily:"monospace", fontSize:"11px", fontWeight:"bold", letterSpacing:"2px" }}>{day.toUpperCase()}</span>
-                            {tasks.some(t=>t.includes("Full mock at")) && <span style={{ background:"#E8532A22", color:"#E8532A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #E8532A44" }}>⚡ MOCK DAY</span>}
-                            {tasks.some(t=>t.includes("Sectional mock")) && <span style={{ background:"#C8972A22", color:"#C8972A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #C8972A44" }}>📝 SECTIONAL</span>}
+                            {isMockD && <span style={{ background:"#E8532A22", color:"#E8532A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #E8532A44" }}>⚡ MOCK DAY</span>}
+                            {isSectD && <span style={{ background:"#C8972A22", color:"#C8972A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #C8972A44" }}>📝 SECTIONAL</span>}
                           </div>
                           <span style={{ color: done===tasks.length ? "#2AAF6F" : "#444", fontFamily:"monospace", fontSize:"10px" }}>{done}/{tasks.length}{done===tasks.length&&tasks.length>0?" ✓ DONE":""}</span>
                         </div>
-                        <div style={{ padding:"10px 16px" }}>
+                        <div style={{ padding:"8px 0" }}>
                           {tasks.map((task, ti) => {
                             const key=`${wData.week}-${day}-${ti}`;
                             const isDone=!!checkedTasks[key];
+                            const tc = { VARC:"#E8532A", Quant:"#4A90D9", LRDI:"#C8972A", revision:"#7B5EA7", concept:"#888", drill:"#D6367A", mock:"#E8532A", break:"#2A2A2A" }[task.tag] || "#444";
+                            const isBreak = task.tag==="break";
                             return (
-                              <div key={ti} onClick={()=>toggleTask(key)} style={{ display:"flex", gap:"12px", alignItems:"flex-start", padding:"8px 10px", marginBottom:"3px", cursor:"pointer", borderRadius:"2px", background: isDone ? "#0A0A0A" : "transparent", transition:"background 0.15s" }}>
-                                <div style={{ flexShrink:0, width:"16px", height:"16px", borderRadius:"2px", border:`2px solid ${isDone ? dc : "#333"}`, background: isDone ? dc : "transparent", display:"flex", alignItems:"center", justifyContent:"center", marginTop:"2px", transition:"all 0.15s" }}>
-                                  {isDone && <span style={{ color:"#000", fontSize:"9px", fontWeight:"bold" }}>✓</span>}
+                              <div key={ti} onClick={()=>{ if(!isBreak) toggleTask(key); }} style={{ display:"flex", gap:"0", alignItems:"stretch", background: isDone ? "#0A0A0A" : isBreak ? "transparent" : "transparent", opacity: isBreak ? 0.5 : 1, transition:"background 0.15s", cursor: isBreak ? "default" : "pointer", borderBottom:"1px solid #111" }}>
+                                {/* Time column */}
+                                <div style={{ width:"110px", flexShrink:0, padding:"10px 12px", fontFamily:"monospace", fontSize:"10px", color:"#444", borderRight:"1px solid #1A1A1A", display:"flex", alignItems:"center" }}>
+                                  {task.time}
                                 </div>
-                                <span style={{ color: isDone ? "#333" : "#CCC", fontSize:"12px", lineHeight:1.6, textDecoration: isDone ? "line-through" : "none", textDecorationColor:"#555", transition:"all 0.2s", flex:1 }}>{task}</span>
+                                {/* Tag strip */}
+                                <div style={{ width:"3px", flexShrink:0, background: isBreak ? "#1A1A1A" : tc }} />
+                                {/* Activity */}
+                                <div style={{ flex:1, padding:"10px 14px", display:"flex", alignItems:"center", gap:"10px" }}>
+                                  {!isBreak && (
+                                    <div style={{ flexShrink:0, width:"15px", height:"15px", borderRadius:"2px", border:`2px solid ${isDone ? tc : "#333"}`, background: isDone ? tc : "transparent", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s" }}>
+                                      {isDone && <span style={{ color:"#000", fontSize:"8px", fontWeight:"bold" }}>✓</span>}
+                                    </div>
+                                  )}
+                                  <span style={{ color: isDone ? "#333" : isBreak ? "#444" : "#CCC", fontSize:"12px", lineHeight:1.5, textDecoration: isDone ? "line-through" : "none", textDecorationColor:"#555", transition:"all 0.2s", flex:1 }}>{task.activity}</span>
+                                  {!isBreak && (
+                                    <span style={{ color: tc, fontSize:"9px", fontFamily:"monospace", letterSpacing:"1px", flexShrink:0, opacity:0.8 }}>{task.tag.toUpperCase()}</span>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}
