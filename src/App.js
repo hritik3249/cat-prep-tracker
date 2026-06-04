@@ -386,9 +386,9 @@ function getDailyTasks(w) {
 }
 
 
-// ─── POMODORO TIMER ──────────────────────────────────────────────────────────
+// ─── FLOATING POMODORO TIMER ────────────────────────────────────────────────
 
-function PomodoroTimer() {
+function FloatingPomodoro() {
   const DEFAULT = { work: 25, shortBreak: 5, longBreak: 15, rounds: 4 };
   const [settings, setSettings] = useState(DEFAULT);
   const [editing, setEditing] = useState(false);
@@ -398,14 +398,14 @@ function PomodoroTimer() {
   const [running, setRunning] = useState(false);
   const [round, setRound] = useState(1);
   const [sessionsToday, setSessionsToday] = useState(0);
+  const [open, setOpen] = useState(false);
   const intervalRef = useRef(null);
   const audioCtx = useRef(null);
-  const autoAdvanceRef = useRef(null); // stores next state to apply after session ends
+  const autoAdvanceRef = useRef(null);
   const settingsRef = useRef(DEFAULT);
   const roundRef = useRef(1);
   const modeRef = useRef("work");
 
-  // Keep refs in sync with state
   useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { roundRef.current = round; }, [round]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
@@ -431,7 +431,6 @@ function PomodoroTimer() {
     } catch(e) {}
   };
 
-  // Auto-advance effect: triggers when running turns false and autoAdvanceRef has a pending transition
   useEffect(() => {
     if (!running && autoAdvanceRef.current) {
       const { nextMode, nextSeconds, nextRound, addSession } = autoAdvanceRef.current;
@@ -440,7 +439,6 @@ function PomodoroTimer() {
       if (nextRound !== undefined) setRound(nextRound);
       setMode(nextMode);
       setSecondsLeft(nextSeconds);
-      // Small delay so state settles, then auto-start
       setTimeout(() => setRunning(true), 200);
     }
   }, [running]);
@@ -452,17 +450,17 @@ function PomodoroTimer() {
           if (s <= 1) {
             clearInterval(intervalRef.current);
             playBeep();
-            const s = settingsRef.current;
+            const st = settingsRef.current;
             const r = roundRef.current;
             const m = modeRef.current;
             if (m === "work") {
-              if (r >= s.rounds) {
-                autoAdvanceRef.current = { nextMode: "longBreak", nextSeconds: s.longBreak * 60, nextRound: 1, addSession: true };
+              if (r >= st.rounds) {
+                autoAdvanceRef.current = { nextMode: "longBreak", nextSeconds: st.longBreak * 60, nextRound: 1, addSession: true };
               } else {
-                autoAdvanceRef.current = { nextMode: "shortBreak", nextSeconds: s.shortBreak * 60, nextRound: r + 1, addSession: true };
+                autoAdvanceRef.current = { nextMode: "shortBreak", nextSeconds: st.shortBreak * 60, nextRound: r + 1, addSession: true };
               }
             } else {
-              autoAdvanceRef.current = { nextMode: "work", nextSeconds: s.work * 60, addSession: false };
+              autoAdvanceRef.current = { nextMode: "work", nextSeconds: st.work * 60, addSession: false };
             }
             setRunning(false);
             return 0;
@@ -476,135 +474,115 @@ function PomodoroTimer() {
     return () => clearInterval(intervalRef.current);
   }, [running]);
 
-  const switchMode = (m) => {
-    setRunning(false);
-    setMode(m);
-    setSecondsLeft(modeDurations[m] * 60);
-  };
-
-  const reset = () => {
-    setRunning(false);
-    setSecondsLeft(modeDurations[mode] * 60);
-  };
+  const switchMode = (m) => { setRunning(false); setMode(m); setSecondsLeft(modeDurations[m] * 60); };
+  const reset = () => { setRunning(false); setSecondsLeft(modeDurations[mode] * 60); };
 
   const mins = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const secs = String(secondsLeft % 60).padStart(2, "0");
   const total = modeDurations[mode] * 60;
   const progress = ((total - secondsLeft) / total) * 100;
   const color = modeColors[mode];
-
   const circumference = 2 * Math.PI * 54;
   const strokeDash = circumference - (progress / 100) * circumference;
 
   return (
-    <div style={{ background:"#141414", border:`1px solid #222`, borderTop:`3px solid ${color}`, padding:"24px", marginBottom:"28px" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px", flexWrap:"wrap", gap:"10px" }}>
-        <div style={{ color:color, fontFamily:"monospace", fontSize:"11px", letterSpacing:"3px", fontWeight:"bold" }}>
-          POMODORO TIMER
-        </div>
-        <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
-          <div style={{ color:"#444", fontFamily:"monospace", fontSize:"10px", marginRight:"8px" }}>
-            TODAY: {sessionsToday} session{sessionsToday !== 1 ? "s" : ""} · ROUND {round}/{settings.rounds}
-          </div>
-          <button onClick={() => { setDraft(settings); setEditing(!editing); }} style={{ background:"#0D0D0D", border:"1px solid #2A2A2A", color:"#555", padding:"4px 12px", fontFamily:"monospace", fontSize:"9px", letterSpacing:"1px", cursor:"pointer" }}>
-            ⚙ SETTINGS
-          </button>
-        </div>
-      </div>
+    <div style={{ position:"fixed", bottom:"24px", right:"24px", zIndex:1000, fontFamily:"'Georgia', serif" }}>
 
-      {/* Settings Panel */}
-      {editing && (
-        <div style={{ background:"#0D0D0D", border:"1px solid #1A1A1A", padding:"16px", marginBottom:"20px" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px", marginBottom:"14px" }}>
-            {[
-              { key:"work", label:"Focus (min)" },
-              { key:"shortBreak", label:"Short Break" },
-              { key:"longBreak", label:"Long Break" },
-              { key:"rounds", label:"Rounds" }
-            ].map(({ key, label }) => (
-              <div key={key}>
-                <div style={{ color:"#555", fontSize:"9px", fontFamily:"monospace", letterSpacing:"1px", marginBottom:"6px" }}>{label.toUpperCase()}</div>
-                <input
-                  type="number" min="1" max="120"
-                  value={draft[key]}
-                  onChange={e => setDraft(prev => ({ ...prev, [key]: Math.max(1, parseInt(e.target.value)||1) }))}
-                  style={{ width:"100%", background:"#141414", border:"1px solid #2A2A2A", color:"#F0EDE8", padding:"6px 8px", fontFamily:"monospace", fontSize:"13px", textAlign:"center" }}
-                />
-              </div>
-            ))}
+      {/* Expanded panel */}
+      {open && (
+        <div style={{ background:"#141414", border:`1px solid #2A2A2A`, borderTop:`3px solid ${color}`, padding:"20px", marginBottom:"10px", width:"320px", boxShadow:"0 8px 32px rgba(0,0,0,0.6)" }}>
+
+          {/* Header */}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
+            <div style={{ color:color, fontFamily:"monospace", fontSize:"10px", letterSpacing:"3px", fontWeight:"bold" }}>POMODORO</div>
+            <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+              <span style={{ color:"#444", fontFamily:"monospace", fontSize:"9px" }}>{sessionsToday} sessions · R{round}/{settings.rounds}</span>
+              <button onClick={() => { setDraft(settings); setEditing(!editing); }} style={{ background:"#0D0D0D", border:"1px solid #2A2A2A", color:"#555", padding:"3px 10px", fontFamily:"monospace", fontSize:"9px", cursor:"pointer" }}>⚙</button>
+            </div>
           </div>
-          <div style={{ display:"flex", gap:"8px" }}>
-            <button onClick={() => {
-              setSettings(draft);
-              setEditing(false);
-              setRunning(false);
-              setSecondsLeft(draft[mode] * 60);
-              setRound(1);
-            }} style={{ background:color, color:"#000", border:"none", padding:"7px 20px", fontFamily:"monospace", fontSize:"10px", letterSpacing:"1px", cursor:"pointer", fontWeight:"bold" }}>
-              APPLY
-            </button>
-            <button onClick={() => { setDraft(DEFAULT); }} style={{ background:"transparent", color:"#555", border:"1px solid #2A2A2A", padding:"7px 16px", fontFamily:"monospace", fontSize:"10px", cursor:"pointer" }}>
-              RESET DEFAULTS
-            </button>
-            <button onClick={() => setEditing(false)} style={{ background:"transparent", color:"#555", border:"none", padding:"7px 12px", fontFamily:"monospace", fontSize:"10px", cursor:"pointer" }}>
-              CANCEL
-            </button>
+
+          {/* Settings Panel */}
+          {editing && (
+            <div style={{ background:"#0D0D0D", border:"1px solid #1A1A1A", padding:"14px", marginBottom:"16px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"8px", marginBottom:"12px" }}>
+                {[{ key:"work", label:"Focus" },{ key:"shortBreak", label:"S.Break" },{ key:"longBreak", label:"L.Break" },{ key:"rounds", label:"Rounds" }].map(({ key, label }) => (
+                  <div key={key}>
+                    <div style={{ color:"#555", fontSize:"8px", fontFamily:"monospace", letterSpacing:"1px", marginBottom:"4px" }}>{label.toUpperCase()}</div>
+                    <input type="number" min="1" max="120" value={draft[key]}
+                      onChange={e => setDraft(prev => ({ ...prev, [key]: Math.max(1, parseInt(e.target.value)||1) }))}
+                      style={{ width:"100%", background:"#141414", border:"1px solid #2A2A2A", color:"#F0EDE8", padding:"5px 4px", fontFamily:"monospace", fontSize:"12px", textAlign:"center" }} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ display:"flex", gap:"6px" }}>
+                <button onClick={() => { setSettings(draft); setEditing(false); setRunning(false); setSecondsLeft(draft[mode] * 60); setRound(1); }} style={{ background:color, color:"#000", border:"none", padding:"5px 14px", fontFamily:"monospace", fontSize:"9px", cursor:"pointer", fontWeight:"bold" }}>APPLY</button>
+                <button onClick={() => setDraft(DEFAULT)} style={{ background:"transparent", color:"#555", border:"1px solid #2A2A2A", padding:"5px 10px", fontFamily:"monospace", fontSize:"9px", cursor:"pointer" }}>RESET</button>
+                <button onClick={() => setEditing(false)} style={{ background:"transparent", color:"#444", border:"none", padding:"5px 8px", fontFamily:"monospace", fontSize:"9px", cursor:"pointer" }}>✕</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display:"flex", gap:"20px", alignItems:"center" }}>
+            {/* Circle */}
+            <div style={{ position:"relative", width:"100px", height:"100px", flexShrink:0 }}>
+              <svg width="100" height="100" style={{ transform:"rotate(-90deg)" }}>
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#1A1A1A" strokeWidth="5" />
+                <circle cx="50" cy="50" r="42" fill="none" stroke={color} strokeWidth="5"
+                  strokeDasharray={2 * Math.PI * 42}
+                  strokeDashoffset={2 * Math.PI * 42 - (progress / 100) * 2 * Math.PI * 42}
+                  strokeLinecap="round" style={{ transition:"stroke-dashoffset 0.5s linear" }} />
+              </svg>
+              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                <div style={{ fontFamily:"monospace", fontSize:"22px", color:"#F0EDE8", letterSpacing:"1px", lineHeight:1 }}>{mins}:{secs}</div>
+                <div style={{ fontFamily:"monospace", fontSize:"8px", color:color, letterSpacing:"1px", marginTop:"3px" }}>{modeLabels[mode]}</div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div style={{ flex:1 }}>
+              {/* Mode buttons */}
+              <div style={{ display:"flex", gap:"4px", marginBottom:"12px", flexWrap:"wrap" }}>
+                {Object.keys(modeLabels).map(m => (
+                  <button key={m} onClick={() => switchMode(m)} style={{ background: mode===m ? color : "#0D0D0D", color: mode===m ? "#000" : "#444", border:`1px solid ${mode===m ? color : "#222"}`, padding:"3px 8px", fontFamily:"monospace", fontSize:"8px", cursor:"pointer", fontWeight: mode===m ? "bold" : "normal" }}>
+                    {modeLabels[m]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Start/Pause + Reset */}
+              <div style={{ display:"flex", gap:"6px", marginBottom:"12px" }}>
+                <button onClick={() => setRunning(r => !r)} style={{ background:color, color:"#000", border:"none", padding:"8px 0", fontFamily:"monospace", fontSize:"11px", cursor:"pointer", fontWeight:"bold", flex:1 }}>
+                  {running ? "⏸ PAUSE" : "▶ START"}
+                </button>
+                <button onClick={reset} style={{ background:"transparent", color:"#555", border:"1px solid #2A2A2A", padding:"8px 10px", fontFamily:"monospace", fontSize:"11px", cursor:"pointer" }}>↺</button>
+                <button onClick={() => { setRunning(false); setRound(1); setSessionsToday(0); switchMode("work"); }} style={{ background:"transparent", color:"#444", border:"1px solid #1A1A1A", padding:"8px 10px", fontFamily:"monospace", fontSize:"11px", cursor:"pointer" }}>✕</button>
+              </div>
+
+              {/* Round dots */}
+              <div style={{ display:"flex", gap:"5px", alignItems:"center" }}>
+                {Array.from({ length: settings.rounds }).map((_, i) => (
+                  <div key={i} style={{ width:"7px", height:"7px", borderRadius:"50%", background: i < round - 1 ? color : i === round - 1 && mode === "work" ? color + "66" : "#1A1A1A", border:`1px solid ${i < round ? color : "#2A2A2A"}`, transition:"all 0.3s" }} />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      <div style={{ display:"flex", gap:"32px", alignItems:"center", flexWrap:"wrap" }}>
-        {/* Circle Timer */}
-        <div style={{ position:"relative", width:"128px", height:"128px", flexShrink:0 }}>
-          <svg width="128" height="128" style={{ transform:"rotate(-90deg)" }}>
-            <circle cx="64" cy="64" r="54" fill="none" stroke="#1A1A1A" strokeWidth="6" />
-            <circle cx="64" cy="64" r="54" fill="none" stroke={color} strokeWidth="6"
-              strokeDasharray={circumference} strokeDashoffset={strokeDash}
-              strokeLinecap="round" style={{ transition:"stroke-dashoffset 0.5s linear" }} />
-          </svg>
-          <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
-            <div style={{ fontFamily:"monospace", fontSize:"28px", color:"#F0EDE8", letterSpacing:"2px", lineHeight:1 }}>{mins}:{secs}</div>
-            <div style={{ fontFamily:"monospace", fontSize:"9px", color:color, letterSpacing:"2px", marginTop:"4px" }}>{modeLabels[mode]}</div>
-          </div>
-        </div>
-
-        {/* Controls */}
-        <div style={{ flex:1, minWidth:"160px" }}>
-          {/* Mode switcher */}
-          <div style={{ display:"flex", gap:"6px", marginBottom:"16px", flexWrap:"wrap" }}>
-            {Object.keys(modeLabels).map(m => (
-              <button key={m} onClick={() => switchMode(m)} style={{ background: mode===m ? color : "#0D0D0D", color: mode===m ? "#000" : "#555", border:`1px solid ${mode===m ? color : "#222"}`, padding:"4px 12px", fontFamily:"monospace", fontSize:"9px", letterSpacing:"1px", cursor:"pointer", fontWeight: mode===m ? "bold" : "normal" }}>
-                {modeLabels[m]}
-              </button>
-            ))}
-          </div>
-
-          {/* Main controls */}
-          <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
-            <button onClick={() => setRunning(r => !r)} style={{ background:color, color:"#000", border:"none", padding:"10px 28px", fontFamily:"monospace", fontSize:"12px", letterSpacing:"2px", cursor:"pointer", fontWeight:"bold", minWidth:"90px" }}>
-              {running ? "⏸ PAUSE" : "▶ START"}
-            </button>
-            <button onClick={reset} style={{ background:"transparent", color:"#555", border:"1px solid #2A2A2A", padding:"10px 16px", fontFamily:"monospace", fontSize:"11px", cursor:"pointer" }}>
-              ↺ RESET
-            </button>
-            <button onClick={() => { setRunning(false); setRound(1); setSessionsToday(0); switchMode("work"); }} style={{ background:"transparent", color:"#444", border:"1px solid #1A1A1A", padding:"10px 16px", fontFamily:"monospace", fontSize:"11px", cursor:"pointer" }}>
-              ✕ CLEAR
-            </button>
-          </div>
-
-          {/* Progress dots */}
-          <div style={{ display:"flex", gap:"6px", marginTop:"14px", alignItems:"center" }}>
-            <span style={{ color:"#444", fontFamily:"monospace", fontSize:"9px", letterSpacing:"1px", marginRight:"4px" }}>ROUNDS</span>
-            {Array.from({ length: settings.rounds }).map((_, i) => (
-              <div key={i} style={{ width:"8px", height:"8px", borderRadius:"50%", background: i < round - 1 ? color : i === round - 1 && mode === "work" ? color + "66" : "#1A1A1A", border:`1px solid ${i < round ? color : "#2A2A2A"}`, transition:"all 0.3s" }} />
-            ))}
-          </div>
-        </div>
+      {/* Floating toggle button */}
+      <div style={{ display:"flex", justifyContent:"flex-end" }}>
+        <button
+          onClick={() => setOpen(o => !o)}
+          style={{ background: running ? color : "#141414", border:`2px solid ${color}`, color: running ? "#000" : color, padding:"10px 16px", fontFamily:"monospace", fontSize:"11px", cursor:"pointer", letterSpacing:"1px", display:"flex", alignItems:"center", gap:"8px", boxShadow:"0 4px 16px rgba(0,0,0,0.5)", transition:"all 0.2s" }}
+        >
+          <span style={{ fontSize:"16px" }}>{running ? "⏱" : "🍅"}</span>
+          <span style={{ fontWeight:"bold" }}>{running ? `${mins}:${secs}` : "POMODORO"}</span>
+          <span style={{ fontSize:"10px", opacity:0.7 }}>{open ? "▼" : "▲"}</span>
+        </button>
       </div>
     </div>
   );
 }
-
 // ─── HELPER COMPONENTS ───────────────────────────────────────────────────────
 
 function SectionTitle({ children, style }) {
@@ -812,7 +790,6 @@ export default function CATPrep() {
           return (
             <div>
               <SectionTitle>Daily Task Checklist</SectionTitle>
-              <PomodoroTimer />
               <p style={{ color:"#666", fontSize:"12px", fontFamily:"monospace", marginBottom:"20px", padding:"12px", background:"#141414", borderLeft:"3px solid #E8532A" }}>
                 Select a week. Check off each task as you complete it. Progress syncs across all your devices automatically.
               </p>
@@ -1154,6 +1131,9 @@ export default function CATPrep() {
           EXECUTE DAILY · REVIEW WEEKLY · ADJUST MONTHLY · TARGET 99
         </div>
       </div>
+
+      {/* Floating Pomodoro */}
+      <FloatingPomodoro />
 
     </div>
   );
