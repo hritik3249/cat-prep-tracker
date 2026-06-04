@@ -483,8 +483,7 @@ function FloatingPomodoro() {
   const progress = ((total - secondsLeft) / total) * 100;
   const color = modeColors[mode];
   const circumference = 2 * Math.PI * 54;
-  const strokeDash = circumference - (progress / 100) * circumference;
-
+  
   return (
     <div style={{ position:"fixed", bottom:"24px", right:"24px", zIndex:1000, fontFamily:"'Georgia', serif" }}>
 
