@@ -608,44 +608,80 @@ export default function CATPrep() {
   const [activeTab, setActiveTab] = useState("roadmap");
   const [checkedTasks, setCheckedTasks] = useState({});
   const [checkedWeekGoals, setCheckedWeekGoals] = useState({});
+  const [taskOrders, setTaskOrders] = useState({});   // key: "week-day" → array of original indices
   const [selectedWeek, setSelectedWeek] = useState(1);
-  const [syncStatus, setSyncStatus] = useState("idle"); // idle | saving | saved | error
+  const [syncStatus, setSyncStatus] = useState("idle");
+  const dragItem = useRef(null);
+  const dragOver = useRef(null);
 
   // Load from Supabase on mount
   useEffect(() => {
     async function loadProgress() {
       const { data: row, error } = await supabase
         .from("progress")
-        .select("checked_tasks, checked_week_goals")
+        .select("checked_tasks, checked_week_goals, task_orders")
         .eq("id", "default")
         .single();
       if (!error && row) {
         setCheckedTasks(row.checked_tasks || {});
         setCheckedWeekGoals(row.checked_week_goals || {});
+        setTaskOrders(row.task_orders || {});
       }
     }
     loadProgress();
   }, []);
 
   // Save to Supabase whenever state changes (debounced)
-  const saveProgress = useCallback(async (tasks, goals) => {
+  const saveProgress = useCallback(async (tasks, goals, orders) => {
     setSyncStatus("saving");
     const { error } = await supabase
       .from("progress")
-      .update({ checked_tasks: tasks, checked_week_goals: goals, updated_at: new Date().toISOString() })
+      .update({ checked_tasks: tasks, checked_week_goals: goals, task_orders: orders, updated_at: new Date().toISOString() })
       .eq("id", "default");
     if (error) { setSyncStatus("error"); }
     else { setSyncStatus("saved"); setTimeout(() => setSyncStatus("idle"), 2000); }
   }, []);
 
   useEffect(() => {
-    if (Object.keys(checkedTasks).length === 0 && Object.keys(checkedWeekGoals).length === 0) return;
-    const timer = setTimeout(() => saveProgress(checkedTasks, checkedWeekGoals), 800);
+    if (Object.keys(checkedTasks).length === 0 && Object.keys(checkedWeekGoals).length === 0 && Object.keys(taskOrders).length === 0) return;
+    const timer = setTimeout(() => saveProgress(checkedTasks, checkedWeekGoals, taskOrders), 800);
     return () => clearTimeout(timer);
-  }, [checkedTasks, checkedWeekGoals, saveProgress]);
+  }, [checkedTasks, checkedWeekGoals, taskOrders, saveProgress]);
 
   const toggleTask = (key) => setCheckedTasks(prev => ({ ...prev, [key]: !prev[key] }));
   const toggleWeekGoal = (weekNum) => setCheckedWeekGoals(prev => ({ ...prev, [weekNum]: !prev[weekNum] }));
+
+  // Reorder tasks for a given week+day
+  const reorderTasks = (weekNum, day, fromIdx, toIdx) => {
+    const orderKey = `${weekNum}-${day}`;
+    setTaskOrders(prev => {
+      const wData = data.weeklyPlan.find(w => w.week === weekNum);
+      const baseTasks = wData ? getDailyTasks(wData)[day] || [] : [];
+      const current = prev[orderKey] || baseTasks.map((_, i) => i);
+      const updated = [...current];
+      const [moved] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, moved);
+      return { ...prev, [orderKey]: updated };
+    });
+  };
+
+  // Get ordered tasks for a day (applying saved order, redistributing times)
+  const getOrderedTasks = (weekNum, day, baseTasks) => {
+    const orderKey = `${weekNum}-${day}`;
+    const order = taskOrders[orderKey];
+    if (!order || order.length !== baseTasks.length) return baseTasks;
+    const times = baseTasks.map(t => t.time);
+    return order.map((origIdx, newIdx) => ({
+      ...baseTasks[origIdx],
+      time: times[newIdx],
+      origIdx
+    }));
+  };
+
+  const resetOrder = (weekNum, day) => {
+    const orderKey = `${weekNum}-${day}`;
+    setTaskOrders(prev => { const n = { ...prev }; delete n[orderKey]; return n; });
+  };
 
   const tabs = [
     { id: "roadmap", label: "4-Month Roadmap" },
@@ -822,31 +858,60 @@ export default function CATPrep() {
                     return <div style={{ background:"#1A1A1A", height:"4px", marginBottom:"24px", borderRadius:"2px" }}><div style={{ background:wData.color, height:"4px", width:`${pct}%`, borderRadius:"2px", transition:"width 0.3s" }} /></div>;
                   })()}
                   {days.map(day => {
-                    const tasks = dailyTasks[day]||[];
+                    const baseTasks = dailyTasks[day]||[];
+                    const tasks = getOrderedTasks(wData.week, day, baseTasks);
+                    const orderKey = `${wData.week}-${day}`;
+                    const isCustomOrdered = !!(taskOrders[orderKey] && taskOrders[orderKey].length === baseTasks.length);
                     const done = tasks.filter((_,ti)=>checkedTasks[`${wData.week}-${day}-${ti}`]).length;
                     const dc = dayColors[day];
                     const isMockD = tasks.some(t=>t.tag==="mock"&&t.activity.includes("Full mock"));
                     const isSectD = tasks.some(t=>t.tag==="mock"&&t.activity.includes("Sectional"));
                     return (
                       <div key={day} style={{ background:"#141414", border:"1px solid #1A1A1A", borderLeft:`3px solid ${dc}`, marginBottom:"12px" }}>
+                        {/* Day header */}
                         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", background:"#0F0F0F", borderBottom:"1px solid #1A1A1A" }}>
                           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                             <span style={{ color:dc, fontFamily:"monospace", fontSize:"11px", fontWeight:"bold", letterSpacing:"2px" }}>{day.toUpperCase()}</span>
                             {isMockD && <span style={{ background:"#E8532A22", color:"#E8532A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #E8532A44" }}>⚡ MOCK DAY</span>}
                             {isSectD && <span style={{ background:"#C8972A22", color:"#C8972A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #C8972A44" }}>📝 SECTIONAL</span>}
+                            {isCustomOrdered && (
+                              <button onClick={() => resetOrder(wData.week, day)} style={{ background:"transparent", border:"1px solid #333", color:"#555", padding:"1px 8px", fontFamily:"monospace", fontSize:"8px", cursor:"pointer", letterSpacing:"1px" }}>↺ RESET ORDER</button>
+                            )}
                           </div>
                           <span style={{ color: done===tasks.length ? "#2AAF6F" : "#444", fontFamily:"monospace", fontSize:"10px" }}>{done}/{tasks.length}{done===tasks.length&&tasks.length>0?" ✓ DONE":""}</span>
                         </div>
+                        {/* Task rows */}
                         <div style={{ padding:"8px 0" }}>
                           {tasks.map((task, ti) => {
-                            const key=`${wData.week}-${day}-${ti}`;
+                            const origIdx = task.origIdx !== undefined ? task.origIdx : ti;
+                            const key=`${wData.week}-${day}-${origIdx}`;
                             const isDone=!!checkedTasks[key];
                             const tc = { VARC:"#E8532A", Quant:"#4A90D9", LRDI:"#C8972A", revision:"#7B5EA7", concept:"#888", drill:"#D6367A", mock:"#E8532A", break:"#2A2A2A" }[task.tag] || "#444";
                             const isBreak = task.tag==="break";
                             return (
-                              <div key={ti} onClick={()=>{ if(!isBreak) toggleTask(key); }} style={{ display:"flex", gap:"0", alignItems:"stretch", background: isDone ? "#0A0A0A" : isBreak ? "transparent" : "transparent", opacity: isBreak ? 0.5 : 1, transition:"background 0.15s", cursor: isBreak ? "default" : "pointer", borderBottom:"1px solid #111" }}>
+                              <div
+                                key={`${origIdx}-${ti}`}
+                                draggable={!isBreak}
+                                onDragStart={() => { dragItem.current = ti; }}
+                                onDragEnter={() => { dragOver.current = ti; }}
+                                onDragEnd={() => {
+                                  if (dragItem.current !== null && dragOver.current !== null && dragItem.current !== dragOver.current) {
+                                    reorderTasks(wData.week, day, dragItem.current, dragOver.current);
+                                  }
+                                  dragItem.current = null;
+                                  dragOver.current = null;
+                                }}
+                                onDragOver={e => e.preventDefault()}
+                                onClick={()=>{ if(!isBreak) toggleTask(key); }}
+                                style={{ display:"flex", gap:"0", alignItems:"stretch", background: isDone ? "#0A0A0A" : "transparent", opacity: isBreak ? 0.5 : 1, transition:"background 0.15s", cursor: isBreak ? "default" : "grab", borderBottom:"1px solid #111", userSelect:"none" }}
+                              >
+                                {/* Drag handle */}
+                                {!isBreak && (
+                                  <div style={{ width:"20px", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", color:"#2A2A2A", fontSize:"12px", borderRight:"1px solid #111" }}>⠿</div>
+                                )}
+                                {isBreak && <div style={{ width:"20px", flexShrink:0 }} />}
                                 {/* Time column */}
-                                <div style={{ width:"110px", flexShrink:0, padding:"10px 12px", fontFamily:"monospace", fontSize:"10px", color:"#444", borderRight:"1px solid #1A1A1A", display:"flex", alignItems:"center" }}>
+                                <div style={{ width:"105px", flexShrink:0, padding:"10px 10px", fontFamily:"monospace", fontSize:"10px", color:"#444", borderRight:"1px solid #1A1A1A", display:"flex", alignItems:"center", lineHeight:1.3 }}>
                                   {task.time}
                                 </div>
                                 {/* Tag strip */}
@@ -854,7 +919,7 @@ export default function CATPrep() {
                                 {/* Activity */}
                                 <div style={{ flex:1, padding:"10px 14px", display:"flex", alignItems:"center", gap:"10px" }}>
                                   {!isBreak && (
-                                    <div style={{ flexShrink:0, width:"15px", height:"15px", borderRadius:"2px", border:`2px solid ${isDone ? tc : "#333"}`, background: isDone ? tc : "transparent", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s" }}>
+                                    <div onClick={e=>{e.stopPropagation(); toggleTask(key);}} style={{ flexShrink:0, width:"15px", height:"15px", borderRadius:"2px", border:`2px solid ${isDone ? tc : "#333"}`, background: isDone ? tc : "transparent", display:"flex", alignItems:"center", justifyContent:"center", transition:"all 0.15s", cursor:"pointer" }}>
                                       {isDone && <span style={{ color:"#000", fontSize:"8px", fontWeight:"bold" }}>✓</span>}
                                     </div>
                                   )}
