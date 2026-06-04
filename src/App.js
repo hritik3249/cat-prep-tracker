@@ -609,6 +609,8 @@ export default function CATPrep() {
   const [checkedTasks, setCheckedTasks] = useState({});
   const [checkedWeekGoals, setCheckedWeekGoals] = useState({});
   const [taskOrders, setTaskOrders] = useState({});   // key: "week-day" → array of original indices
+  const [customTimes, setCustomTimes] = useState({});  // key: "week-day-ti" → custom time string
+  const [editingTime, setEditingTime] = useState(null); // key of time being edited
   const [selectedWeek, setSelectedWeek] = useState(1);
   const [syncStatus, setSyncStatus] = useState("idle");
   const dragItem = useRef(null);
@@ -619,34 +621,35 @@ export default function CATPrep() {
     async function loadProgress() {
       const { data: row, error } = await supabase
         .from("progress")
-        .select("checked_tasks, checked_week_goals, task_orders")
+        .select("checked_tasks, checked_week_goals, task_orders, custom_times")
         .eq("id", "default")
         .single();
       if (!error && row) {
         setCheckedTasks(row.checked_tasks || {});
         setCheckedWeekGoals(row.checked_week_goals || {});
         setTaskOrders(row.task_orders || {});
+        setCustomTimes(row.custom_times || {});
       }
     }
     loadProgress();
   }, []);
 
   // Save to Supabase whenever state changes (debounced)
-  const saveProgress = useCallback(async (tasks, goals, orders) => {
+  const saveProgress = useCallback(async (tasks, goals, orders, times) => {
     setSyncStatus("saving");
     const { error } = await supabase
       .from("progress")
-      .update({ checked_tasks: tasks, checked_week_goals: goals, task_orders: orders, updated_at: new Date().toISOString() })
+      .update({ checked_tasks: tasks, checked_week_goals: goals, task_orders: orders, custom_times: times, updated_at: new Date().toISOString() })
       .eq("id", "default");
     if (error) { setSyncStatus("error"); }
     else { setSyncStatus("saved"); setTimeout(() => setSyncStatus("idle"), 2000); }
   }, []);
 
   useEffect(() => {
-    if (Object.keys(checkedTasks).length === 0 && Object.keys(checkedWeekGoals).length === 0 && Object.keys(taskOrders).length === 0) return;
-    const timer = setTimeout(() => saveProgress(checkedTasks, checkedWeekGoals, taskOrders), 800);
+    if (Object.keys(checkedTasks).length === 0 && Object.keys(checkedWeekGoals).length === 0 && Object.keys(taskOrders).length === 0 && Object.keys(customTimes).length === 0) return;
+    const timer = setTimeout(() => saveProgress(checkedTasks, checkedWeekGoals, taskOrders, customTimes), 800);
     return () => clearTimeout(timer);
-  }, [checkedTasks, checkedWeekGoals, taskOrders, saveProgress]);
+  }, [checkedTasks, checkedWeekGoals, taskOrders, customTimes, saveProgress]);
 
   const toggleTask = (key) => setCheckedTasks(prev => ({ ...prev, [key]: !prev[key] }));
   const toggleWeekGoal = (weekNum) => setCheckedWeekGoals(prev => ({ ...prev, [weekNum]: !prev[weekNum] }));
@@ -911,9 +914,41 @@ export default function CATPrep() {
                                 )}
                                 {isBreak && <div style={{ width:"20px", flexShrink:0 }} />}
                                 {/* Time column */}
-                                <div style={{ width:"105px", flexShrink:0, padding:"10px 10px", fontFamily:"monospace", fontSize:"10px", color:"#444", borderRight:"1px solid #1A1A1A", display:"flex", alignItems:"center", lineHeight:1.3 }}>
-                                  {task.time}
-                                </div>
+                                {(() => {
+                                  const timeKey = `${wData.week}-${day}-${origIdx}`;
+                                  const displayTime = customTimes[timeKey] || task.time;
+                                  const isEditingThisTime = editingTime === timeKey;
+                                  return (
+                                    <div style={{ width:"115px", flexShrink:0, borderRight:"1px solid #1A1A1A", display:"flex", alignItems:"center", position:"relative" }}>
+                                      {isEditingThisTime ? (
+                                        <input
+                                          autoFocus
+                                          defaultValue={displayTime}
+                                          onBlur={e => {
+                                            const val = e.target.value.trim();
+                                            if (val) setCustomTimes(prev => ({ ...prev, [timeKey]: val }));
+                                            setEditingTime(null);
+                                          }}
+                                          onKeyDown={e => {
+                                            if (e.key === "Enter") e.target.blur();
+                                            if (e.key === "Escape") { setEditingTime(null); }
+                                          }}
+                                          onClick={e => e.stopPropagation()}
+                                          style={{ width:"100%", background:"#0D0D0D", border:"none", borderBottom:"1px solid #E8532A", color:"#F0EDE8", padding:"10px 8px", fontFamily:"monospace", fontSize:"9px", outline:"none", lineHeight:1.3 }}
+                                        />
+                                      ) : (
+                                        <div
+                                          onClick={e => { e.stopPropagation(); if (!isBreak) setEditingTime(timeKey); }}
+                                          title={isBreak ? "" : "Click to edit time"}
+                                          style={{ width:"100%", padding:"10px 8px", fontFamily:"monospace", fontSize:"10px", color: customTimes[timeKey] ? "#CCC" : "#383838", lineHeight:1.3, cursor: isBreak ? "default" : "text", display:"flex", alignItems:"center", gap:"4px" }}
+                                        >
+                                          <span style={{ flex:1 }}>{displayTime}</span>
+                                          {!isBreak && <span style={{ color:"#2A2A2A", fontSize:"8px", opacity:0.6 }}>✎</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                                 {/* Tag strip */}
                                 <div style={{ width:"3px", flexShrink:0, background: isBreak ? "#1A1A1A" : tc }} />
                                 {/* Activity */}
