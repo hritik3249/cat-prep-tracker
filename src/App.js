@@ -143,26 +143,27 @@ const data = {
     }
   ],
   schedule: [
-    { time: "11:00–11:30 AM", activity: "Post-gym wind down + shower + breakfast. Read 1 editorial (The Hindu/Economist) while eating — untimed.", tag: "VARC" },
-    { time: "11:30 AM–12:30 PM", activity: "VARC: 3 RC passages timed (8 min each) + 10 VA questions (12 min)", tag: "VARC" },
-    { time: "12:30–1:00 PM", activity: "VARC review: Write 1 line explaining every wrong answer. Not just 'B is correct'—why.", tag: "VARC" },
-    { time: "1:00–2:00 PM", activity: "Quant: 20 questions timed (40 min) + 20 min review of every wrong answer", tag: "Quant" },
-    { time: "2:00–3:00 PM", activity: "Lunch + rest. Full mental break — no content.", tag: "break" },
-    { time: "3:00–4:00 PM", activity: "LRDI: 2 sets timed (12 min each) + 30 min set analysis", tag: "LRDI" },
-    { time: "4:00–4:15 PM", activity: "Break", tag: "break" },
-    { time: "4:15–5:15 PM", activity: "Concept study: Current week's weakest topic — theory + 15 practice questions", tag: "concept" },
-    { time: "5:15–5:30 PM", activity: "Break", tag: "break" },
-    { time: "5:30–6:30 PM", activity: "Error log review: Redo yesterday's flagged wrong questions cold (no solutions)", tag: "revision" },
-    { time: "6:30–7:30 PM", activity: "Drill session: 25 questions from this week's topic focus, timed", tag: "drill" },
-    { time: "7:30–8:00 PM", activity: "Formula sheet revision (10 min) + Update error log + daily tracker", tag: "revision" },
-    { time: "8:00–9:00 PM", activity: "Dinner + disconnect completely", tag: "break" },
-    { time: "9:00–10:00 PM", activity: "VARC: 1 additional RC or VA drill + speed reading practice (250 wpm target)", tag: "VARC" },
-    { time: "10:00–10:30 PM", activity: "Light: watch 1 concept video on tomorrow's topic. No heavy solving.", tag: "concept" },
-    { time: "10:30 PM", activity: "Stop. Sleep by 11 PM — 8 hrs before gym. Non-negotiable.", tag: "break" }
+    { time: "8:00–8:30 AM",    activity: "Wake up + breakfast. Read 1 editorial (The Hindu/Economist) while eating — untimed.", tag: "VARC" },
+    { time: "8:30–9:30 AM",    activity: "VARC: 3 RC passages timed (8 min each) + 10 VA questions (12 min)", tag: "VARC" },
+    { time: "9:30–10:00 AM",   activity: "VARC review: Write 1 line explaining every wrong answer. Not just 'B is correct'—why.", tag: "VARC" },
+    { time: "10:00–11:00 AM",  activity: "Quant: 20 questions timed (40 min) + 20 min review of every wrong answer", tag: "Quant" },
+    { time: "11:00–11:30 AM",  activity: "Break + snack", tag: "break" },
+    { time: "11:30 AM–12:30 PM", activity: "LRDI: 2 sets timed (12 min each) + 30 min set analysis", tag: "LRDI" },
+    { time: "12:30–1:30 PM",   activity: "Lunch + rest. Full mental break — no content.", tag: "break" },
+    { time: "1:30–2:30 PM",    activity: "Concept study: Current week's weakest topic — theory + 15 practice questions", tag: "concept" },
+    { time: "2:30–2:45 PM",    activity: "Break", tag: "break" },
+    { time: "2:45–3:45 PM",    activity: "Error log review: Redo yesterday's flagged wrong questions cold (no solutions)", tag: "revision" },
+    { time: "3:45–4:45 PM",    activity: "Drill session: 25 questions from this week's topic focus, timed", tag: "drill" },
+    { time: "4:45–5:15 PM",    activity: "Formula sheet revision (10 min) + Update error log + daily tracker", tag: "revision" },
+    { time: "5:15–6:15 PM",    activity: "VARC: 1 additional RC or VA drill + speed reading practice (250 wpm target)", tag: "VARC" },
+    { time: "6:15–7:00 PM",    activity: "Wind down. Light: watch 1 concept video on tomorrow's topic. Prep for gym.", tag: "concept" },
+    { time: "7:00–10:00 PM",   activity: "GYM — non-negotiable.", tag: "break" },
+    { time: "10:00–10:30 PM",  activity: "Post-gym wind down + shower + dinner", tag: "break" },
+    { time: "10:30 PM",        activity: "Stop. Sleep by 11:30 PM. Non-negotiable.", tag: "break" }
   ],
   mockStrategy: [
     { step: "01", title: "When to Start", detail: "Week 5 (Month 2): Begin 1 sectional mock/week. Week 9 (Month 3): Shift to 2 full mocks/week. Month 4: 3 full mocks/week." },
-    { step: "02", title: "Mock Day Protocol", detail: "Take mock at 11:30 AM (post-gym). Strict 2-hr timer. No phone. Same pen/scratch paper setup. After mock—rest 30 min before analysis." },
+    { step: "02", title: "Mock Day Protocol", detail: "Take mock at 8:30 AM (morning, peak brain hours). Strict 2-hr timer. No phone. Same pen/scratch paper setup. After mock—rest 30 min before analysis. Gym as usual at 7 PM." },
     { step: "03", title: "3-Hour Post-Mock Analysis", detail: "Hour 1: Section-by-section score breakdown. Calculate: attempted, correct, incorrect, accuracy %. Hour 2: Re-solve every wrong question without time limit. Categorize: Concept Gap / Calculation Error / Careless / Time Pressure. Hour 3: Update error log. Identify 1 pattern per section that cost you score." },
     { step: "04", title: "Mock-to-Mock Improvement", detail: "Before next mock: Solve 20 questions from your error categories. Set 1 specific process target (e.g., 'I will not attempt more than 3 RCs'). After 4 mocks, review cumulative error patterns." },
     { step: "05", title: "Score Targets by Month", detail: "Month 2 (sectionals): 70%+ accuracy per section. Month 3 (full mocks): Raw score 120+. Month 4 (peak): Raw score 145+ consistently." }
@@ -341,73 +342,81 @@ function getDailyTasks(w) {
 
     let t = [];
 
+    const gymBlock = [
+      { time:"7:00–10:00 PM",  activity:"GYM — non-negotiable.", tag:"break" },
+      { time:"10:00–10:30 PM", activity:"Post-gym wind down + shower + dinner", tag:"break" },
+      { time:"10:30 PM",       activity:"Stop. Sleep by 11:30 PM. Non-negotiable.", tag:"break" },
+    ];
+
     if (isTaper) {
       if (i===0) {
         t = [
-          { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast", tag:"break" },
-          { time:"11:30 AM–12:00 PM", activity:"Read editorial (The Hindu) — light, no pressure", tag:"VARC" },
-          { time:"12:00–12:30 PM", activity:"Formula sheet revision — 15 min only", tag:"revision" },
-          { time:"12:30–1:30 PM", activity:"10 easy Quant Qs — confidence only, no hard problems", tag:"Quant" },
-          { time:"1:30–2:30 PM", activity:"2 RCs light reading — no timer, no score pressure", tag:"VARC" },
-          { time:"2:30 PM onwards", activity:"Rest. No more CAT content today.", tag:"break" },
+          { time:"8:00–8:30 AM",  activity:"Wake up + breakfast. Read editorial (The Hindu) — light, no pressure", tag:"VARC" },
+          { time:"8:30–9:00 AM",  activity:"Formula sheet revision — 15 min only", tag:"revision" },
+          { time:"9:00–9:30 AM",  activity:"10 easy Quant Qs — confidence only, no hard problems", tag:"Quant" },
+          { time:"9:30–10:30 AM", activity:"2 RCs light reading — no timer, no score pressure", tag:"VARC" },
+          { time:"10:30 AM–7:00 PM", activity:"Rest. No more CAT content until gym.", tag:"break" },
+          ...gymBlock,
         ];
       } else if (i===1) {
         t = [
-          { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast", tag:"break" },
-          { time:"11:30 AM–12:00 PM", activity:"Read editorial — light reading only", tag:"VARC" },
-          { time:"12:00–12:30 PM", activity:"Formula sheet revision — 15 min only", tag:"revision" },
-          { time:"12:30–1:00 PM", activity:"5 VA questions only — no drilling", tag:"VARC" },
-          { time:"1:00–1:30 PM", activity:"1 LRDI set from your strongest type — confidence", tag:"LRDI" },
-          { time:"1:30 PM onwards", activity:"Rest. Sleep 8 hours tonight.", tag:"break" },
+          { time:"8:00–8:30 AM", activity:"Wake up + breakfast. Read editorial — light reading only", tag:"VARC" },
+          { time:"8:30–9:00 AM", activity:"Formula sheet revision — 15 min only", tag:"revision" },
+          { time:"9:00–9:30 AM", activity:"5 VA questions only — no drilling", tag:"VARC" },
+          { time:"9:30–10:00 AM", activity:"1 LRDI set from your strongest type — confidence", tag:"LRDI" },
+          { time:"10:00 AM–7:00 PM", activity:"Rest. Sleep 8 hours tonight after gym.", tag:"break" },
+          ...gymBlock,
         ];
       } else {
         t = [
-          { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast", tag:"break" },
-          { time:"11:30 AM–12:00 PM", activity:"Read editorial only — no solving whatsoever", tag:"VARC" },
-          { time:"12:00–12:30 PM", activity:"Review strategy notes: section attempt order, set selection plan", tag:"revision" },
-          { time:"12:30 PM onwards", activity:"Rest. Sleep 8 hours. No CAT content.", tag:"break" },
+          { time:"8:00–8:30 AM", activity:"Wake up + breakfast. Read editorial only — no solving whatsoever", tag:"VARC" },
+          { time:"8:30–9:00 AM", activity:"Review strategy notes: section attempt order, set selection plan", tag:"revision" },
+          { time:"9:00 AM–7:00 PM", activity:"Rest. No CAT content.", tag:"break" },
+          ...gymBlock,
         ];
       }
     } else if (isMockDay) {
       t = [
-        { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast + editorial read", tag:"break" },
-        { time:"11:30 AM–1:30 PM", activity:"Full mock — strict 2-hour timer, phone off, rough paper ready", tag:"mock" },
-        { time:"1:30–2:00 PM", activity:"Rest after mock — do not start analysis yet", tag:"break" },
-        { time:"2:00–3:00 PM", activity:"Mock analysis Hour 1: score breakdown — attempted / correct / incorrect / accuracy % per section", tag:"revision" },
-        { time:"3:00–4:00 PM", activity:"Mock analysis Hour 2: re-solve every wrong Q without timer, classify error type A/B/C/D", tag:"revision" },
-        { time:"4:00–5:00 PM", activity:"Mock analysis Hour 3: update error log, identify 1 dominant pattern per section", tag:"revision" },
-        { time:"5:00–5:30 PM", activity:"Write down 1 specific process target for next mock", tag:"revision" },
-        { time:"5:30 PM onwards", activity:"Completely off — no more CAT content", tag:"break" },
+        { time:"8:00–8:30 AM",   activity:"Wake up + breakfast + editorial read", tag:"break" },
+        { time:"8:30–10:30 AM",  activity:"Full mock — strict 2-hour timer, phone off, rough paper ready", tag:"mock" },
+        { time:"10:30–11:00 AM", activity:"Rest after mock — do not start analysis yet", tag:"break" },
+        { time:"11:00 AM–12:00 PM", activity:"Mock analysis Hour 1: score breakdown — attempted / correct / incorrect / accuracy % per section", tag:"revision" },
+        { time:"12:00–1:00 PM",  activity:"Mock analysis Hour 2: re-solve every wrong Q without timer, classify error type A/B/C/D", tag:"revision" },
+        { time:"1:00–2:00 PM",   activity:"Mock analysis Hour 3: update error log, identify 1 dominant pattern per section", tag:"revision" },
+        { time:"2:00–2:30 PM",   activity:"Write down 1 specific process target for next mock", tag:"revision" },
+        { time:"2:30–7:00 PM",   activity:"Completely off — no more CAT content", tag:"break" },
+        ...gymBlock,
       ];
     } else if (isSectionalDay) {
       t = [
-        { time:"11:00–11:30 AM", activity:"Post-gym wind down + breakfast + editorial read", tag:"break" },
-        { time:"11:30 AM–12:10 PM", activity:"Sectional mock — 40 min strict timer, no pausing", tag:"mock" },
-        { time:"12:10–1:40 PM", activity:"1.5-hour sectional analysis: mark every wrong answer with error type", tag:"revision" },
-        { time:"1:40–2:00 PM", activity:"Update error log from today's sectional", tag:"revision" },
-        { time:"2:00–3:00 PM", activity:"Lunch + rest", tag:"break" },
-        { time:"3:00–4:00 PM", activity:"VARC: " + w.varc.questions, tag:"VARC" },
-        { time:"4:00–5:00 PM", activity:"Quant: " + w.quant.questions, tag:"Quant" },
-        { time:"5:00–5:30 PM", activity:"Formula sheet revision — 5 min + update daily tracker", tag:"revision" },
+        { time:"8:00–8:30 AM",    activity:"Wake up + breakfast + editorial read", tag:"break" },
+        { time:"8:30–9:10 AM",    activity:"Sectional mock — 40 min strict timer, no pausing", tag:"mock" },
+        { time:"9:10–10:40 AM",   activity:"1.5-hour sectional analysis: mark every wrong answer with error type", tag:"revision" },
+        { time:"10:40–11:00 AM",  activity:"Update error log from today's sectional", tag:"revision" },
+        { time:"11:00 AM–12:00 PM", activity:"Break + lunch", tag:"break" },
+        { time:"12:00–1:00 PM",   activity:"VARC: " + w.varc.questions, tag:"VARC" },
+        { time:"1:00–2:00 PM",    activity:"Quant: " + w.quant.questions, tag:"Quant" },
+        { time:"2:00–2:30 PM",    activity:"Formula sheet revision — 5 min + update daily tracker", tag:"revision" },
+        { time:"2:30–7:00 PM",    activity:"Free time / buffer", tag:"break" },
+        ...gymBlock,
       ];
     } else {
       t = [
-        { time:"11:00–11:30 AM", activity:"Post-gym wind down + shower + breakfast. Read 1 editorial while eating — untimed", tag:"VARC" },
-        { time:"11:30 AM–12:30 PM", activity:"VARC: " + w.varc.questions, tag:"VARC" },
-        { time:"12:30–1:00 PM", activity:"VARC review: 1-line explanation for every wrong answer — why wrong, not just what is correct", tag:"VARC" },
-        { time:"1:00–2:00 PM", activity:"Quant: " + w.quant.questions, tag:"Quant" },
-        { time:"2:00–3:00 PM", activity:"Lunch + rest — full mental break, no content", tag:"break" },
-        { time:"3:00–4:00 PM", activity:"LRDI: " + w.lrdi.questions, tag:"LRDI" },
-        { time:"4:00–4:15 PM", activity:"Break", tag:"break" },
-        { time:"4:15–5:15 PM", activity:"Quant concept: " + w.quant.topics[i % w.quant.topics.length], tag:"concept" },
-        { time:"5:15–5:30 PM", activity:"Break", tag:"break" },
-        { time:"5:30–6:30 PM", activity:"Error log: redo yesterday's flagged wrong questions cold (no solutions)", tag:"revision" },
-        { time:"6:30–7:30 PM", activity:"Drill session: 25 questions from this week's topic focus, timed", tag:"drill" },
-        { time:"7:30–8:00 PM", activity:"Formula sheet revision — 5 min + update error log + daily tracker", tag:"revision" },
-        { time:"8:00–9:00 PM", activity:"Dinner + disconnect completely", tag:"break" },
-        { time:"9:00–10:00 PM", activity:"VARC: 1 additional RC or VA drill + speed reading practice (250 wpm target)", tag:"VARC" },
-        { time:"10:00–10:30 PM", activity:"Watch 1 concept video on tomorrow's topic — no heavy solving", tag:"concept" },
-        { time:"10:30 PM", activity:"Stop. Sleep by 11 PM — 8 hrs before gym. Non-negotiable.", tag:"break" },
+        { time:"8:00–8:30 AM",    activity:"Wake up + breakfast. Read 1 editorial while eating — untimed", tag:"VARC" },
+        { time:"8:30–9:30 AM",    activity:"VARC: " + w.varc.questions, tag:"VARC" },
+        { time:"9:30–10:00 AM",   activity:"VARC review: 1-line explanation for every wrong answer — why wrong, not just what is correct", tag:"VARC" },
+        { time:"10:00–11:00 AM",  activity:"Quant: " + w.quant.questions, tag:"Quant" },
+        { time:"11:00–11:30 AM",  activity:"Break + snack", tag:"break" },
+        { time:"11:30 AM–12:30 PM", activity:"LRDI: " + w.lrdi.questions, tag:"LRDI" },
+        { time:"12:30–1:30 PM",   activity:"Lunch + rest — full mental break, no content", tag:"break" },
+        { time:"1:30–2:30 PM",    activity:"Quant concept: " + w.quant.topics[i % w.quant.topics.length], tag:"concept" },
+        { time:"2:30–2:45 PM",    activity:"Break", tag:"break" },
+        { time:"2:45–3:45 PM",    activity:"Error log: redo yesterday's flagged wrong questions cold (no solutions)", tag:"revision" },
+        { time:"3:45–4:45 PM",    activity:"Drill session: 25 questions from this week's topic focus, timed", tag:"drill" },
+        { time:"4:45–5:15 PM",    activity:"Formula sheet revision — 5 min + update error log + daily tracker", tag:"revision" },
+        { time:"5:15–6:15 PM",    activity:"VARC: 1 additional RC or VA drill + speed reading practice (250 wpm target)", tag:"VARC" },
+        { time:"6:15–7:00 PM",    activity:"Wind down. Watch 1 concept video on tomorrow's topic. Prep for gym.", tag:"concept" },
+        ...gymBlock,
       ];
     }
     tasks[day] = t;
@@ -1258,7 +1267,7 @@ export default function CATPrep() {
             </div>
             <div style={{ background:"#141414", border:"1px solid #222", padding:"24px", marginTop:"24px" }}>
               <Label>Sunday Schedule (Different from Weekday)</Label>
-              {["Post-gym at 11 AM: 30 min breakfast + settle down","11:30 AM–1:30 PM: Full mock (2 hours, strictly timed — phone off, rough paper ready)","1:30–2:30 PM: Lunch + rest. Do not start analysis yet.","2:30–5:30 PM: Full 3-hour mock analysis (non-negotiable — this is where improvement happens)","5:30 PM onwards: Completely OFF. No studying, no CAT content."].map((item, i) => (
+              {["8:00 AM: Wake up + breakfast + settle down","8:30–10:30 AM: Full mock (2 hours, strictly timed — phone off, rough paper ready)","10:30–11:00 AM: Rest after mock. Do not start analysis yet.","11:00 AM–2:00 PM: Full 3-hour mock analysis (non-negotiable — this is where improvement happens)","2:00–7:00 PM: Completely OFF. No studying, no CAT content.","7:00–10:00 PM: GYM as usual.","10:00–10:30 PM: Post-gym wind down + dinner. Sleep by 11:30 PM."].map((item, i) => (
                 <BulletItem key={i} color="#E8532A">{item}</BulletItem>
               ))}
             </div>
