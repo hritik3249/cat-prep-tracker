@@ -796,8 +796,8 @@ export default function CATPrep() {
                 onKeyDown={e => { if(e.key==="Enter") e.target.blur(); if(e.key==="Escape") setEditingStartDate(false); }}
                 style={{ background:"#1A1A1A", border:"1px solid #555", color:"#F0EDE8", padding:"3px 8px", fontFamily:"monospace", fontSize:"11px" }} />
             ) : (
-              <div onClick={() => setEditingStartDate(true)} title="Click to set Day 1 start date" style={{ color:"#666", fontSize:"11px", fontFamily:"monospace", letterSpacing:"2px", cursor:"pointer" }}>
-                {currentWeekNum ? `WEEK ${currentWeekNum} OF 16` : "SET START DATE"}
+              <div onClick={() => setEditingStartDate(true)} title="Click to set Day 1 start date" style={{ border:`1px solid ${currentWeekNum ? "#444" : "#888"}`, color: currentWeekNum ? "#888" : "#F0EDE8", background: currentWeekNum ? "transparent" : "#2A2A2A", padding:"4px 12px", fontSize:"10px", fontFamily:"monospace", letterSpacing:"2px", cursor:"pointer" }}>
+                {currentWeekNum ? `WEEK ${currentWeekNum} OF 16` : "✎ SET START DATE"}
               </div>
             )}
             {currentStreak > 0 && (
