@@ -1,6 +1,36 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabase";
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 700);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 700);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return isMobile;
+}
+
+function getCurrentWeekNum(startDate) {
+  if (!startDate) return null;
+  const start = new Date(startDate);
+  const today = new Date();
+  const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return null;
+  return Math.min(Math.max(Math.floor(diffDays / 7) + 1, 1), 16);
+}
+
+function getTodayName() {
+  const d = new Date().getDay(); // 0=Sun
+  return ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][d];
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const diff = new Date(dateStr) - new Date(new Date().toDateString());
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
 const data = {
@@ -280,13 +310,13 @@ const data = {
 };
 
 const tagColors = {
-  VARC: { bg: "#FEF0EB", text: "#E8532A", border: "#E8532A" },
-  LRDI: { bg: "#FDF6E8", text: "#C8972A", border: "#C8972A" },
-  Quant: { bg: "#EBF4FD", text: "#4A90D9", border: "#4A90D9" },
-  break: { bg: "#F0F7F4", text: "#2AAF6F", border: "#2AAF6F" },
-  revision: { bg: "#F5F0FA", text: "#7B5EA7", border: "#7B5EA7" },
-  concept: { bg: "#F8F8F8", text: "#555", border: "#999" },
-  drill: { bg: "#FFF0F5", text: "#D6367A", border: "#D6367A" }
+  VARC:     { bg: "#2A1208", text: "#E8532A", border: "#E8532A55" },
+  LRDI:     { bg: "#221800", text: "#C8972A", border: "#C8972A55" },
+  Quant:    { bg: "#0D1A2A", text: "#4A90D9", border: "#4A90D955" },
+  break:    { bg: "#0A1A12", text: "#2AAF6F", border: "#2AAF6F55" },
+  revision: { bg: "#1A1028", text: "#7B5EA7", border: "#7B5EA755" },
+  concept:  { bg: "#1A1A1A", text: "#888",    border: "#44444455" },
+  drill:    { bg: "#2A0A18", text: "#D6367A", border: "#D6367A55" }
 };
 
 // ─── DAILY TASKS GENERATOR ───────────────────────────────────────────────────
@@ -608,10 +638,17 @@ export default function CATPrep() {
   const [activeTab, setActiveTab] = useState("roadmap");
   const [checkedTasks, setCheckedTasks] = useState({});
   const [checkedWeekGoals, setCheckedWeekGoals] = useState({});
-  const [taskOrders, setTaskOrders] = useState({});   // key: "week-day" → array of original indices
-  const [customTimes, setCustomTimes] = useState({});  // key: "week-day-ti" → custom time string
-  const [editingTime, setEditingTime] = useState(null); // key of time being edited
+  const [taskOrders, setTaskOrders] = useState({});
+  const [customTimes, setCustomTimes] = useState({});
+  const [editingTime, setEditingTime] = useState(null);
   const [selectedWeek, setSelectedWeek] = useState(1);
+  const [startDate, setStartDate] = useState("");
+  const [examDate, setExamDate] = useState("2026-11-29");
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [lastActiveDate, setLastActiveDate] = useState("");
+  const [editingExamDate, setEditingExamDate] = useState(false);
+  const [editingStartDate, setEditingStartDate] = useState(false);
+  const isMobile = useIsMobile();
   const [syncStatus, setSyncStatus] = useState("idle");
   const dragItem = useRef(null);
   const dragOver = useRef(null);
@@ -621,7 +658,7 @@ export default function CATPrep() {
     async function loadProgress() {
       const { data: row, error } = await supabase
         .from("progress")
-        .select("checked_tasks, checked_week_goals, task_orders, custom_times")
+        .select("checked_tasks, checked_week_goals, task_orders, custom_times, start_date, exam_date, current_streak, last_active_date")
         .eq("id", "default")
         .single();
       if (!error && row) {
@@ -629,29 +666,49 @@ export default function CATPrep() {
         setCheckedWeekGoals(row.checked_week_goals || {});
         setTaskOrders(row.task_orders || {});
         setCustomTimes(row.custom_times || {});
+        if (row.start_date) setStartDate(row.start_date);
+        if (row.exam_date) setExamDate(row.exam_date);
+        if (row.current_streak) setCurrentStreak(row.current_streak);
+        if (row.last_active_date) setLastActiveDate(row.last_active_date);
+        // auto-select current week based on start date
+        const wk = getCurrentWeekNum(row.start_date);
+        if (wk) setSelectedWeek(wk);
       }
     }
     loadProgress();
   }, []);
 
   // Save to Supabase whenever state changes (debounced)
-  const saveProgress = useCallback(async (tasks, goals, orders, times) => {
+  const saveProgress = useCallback(async (tasks, goals, orders, times, streak, lastDate, startDt, examDt) => {
     setSyncStatus("saving");
     const { error } = await supabase
       .from("progress")
-      .update({ checked_tasks: tasks, checked_week_goals: goals, task_orders: orders, custom_times: times, updated_at: new Date().toISOString() })
+      .update({ checked_tasks: tasks, checked_week_goals: goals, task_orders: orders, custom_times: times, current_streak: streak, last_active_date: lastDate, start_date: startDt, exam_date: examDt, updated_at: new Date().toISOString() })
       .eq("id", "default");
     if (error) { setSyncStatus("error"); }
     else { setSyncStatus("saved"); setTimeout(() => setSyncStatus("idle"), 2000); }
   }, []);
 
   useEffect(() => {
-    if (Object.keys(checkedTasks).length === 0 && Object.keys(checkedWeekGoals).length === 0 && Object.keys(taskOrders).length === 0 && Object.keys(customTimes).length === 0) return;
-    const timer = setTimeout(() => saveProgress(checkedTasks, checkedWeekGoals, taskOrders, customTimes), 800);
+    if (Object.keys(checkedTasks).length === 0 && Object.keys(checkedWeekGoals).length === 0 && Object.keys(taskOrders).length === 0 && Object.keys(customTimes).length === 0 && !startDate && !examDate) return;
+    const timer = setTimeout(() => saveProgress(checkedTasks, checkedWeekGoals, taskOrders, customTimes, currentStreak, lastActiveDate, startDate, examDate), 800);
     return () => clearTimeout(timer);
-  }, [checkedTasks, checkedWeekGoals, taskOrders, customTimes, saveProgress]);
+  }, [checkedTasks, checkedWeekGoals, taskOrders, customTimes, currentStreak, lastActiveDate, startDate, examDate, saveProgress]);
 
-  const toggleTask = (key) => setCheckedTasks(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleTask = (key) => {
+    setCheckedTasks(prev => {
+      const newVal = !prev[key];
+      if (newVal) {
+        const today = new Date().toISOString().split("T")[0];
+        if (lastActiveDate !== today) {
+          const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+          setCurrentStreak(s => lastActiveDate === yesterday ? s + 1 : 1);
+          setLastActiveDate(today);
+        }
+      }
+      return { ...prev, [key]: newVal };
+    });
+  };
   const toggleWeekGoal = (weekNum) => setCheckedWeekGoals(prev => ({ ...prev, [weekNum]: !prev[weekNum] }));
 
   // Reorder tasks for a given week+day
@@ -687,15 +744,19 @@ export default function CATPrep() {
   };
 
   const tabs = [
-    { id: "roadmap", label: "4-Month Roadmap" },
-    { id: "weekly", label: "Week-by-Week Plan" },
-    { id: "dailytasks", label: "Daily Tasks" },
-    { id: "sections", label: "Section Strategy" },
-    { id: "daily", label: "Daily Routine" },
-    { id: "mocks", label: "Mock Strategy" },
-    { id: "milestones", label: "Milestones" },
-    { id: "resources", label: "Resources" },
+    { id: "roadmap",    label: "4-Month Roadmap",    short: "Roadmap" },
+    { id: "weekly",     label: "Week-by-Week Plan",  short: "Weekly" },
+    { id: "dailytasks", label: "Daily Tasks",         short: "Tasks" },
+    { id: "sections",   label: "Section Strategy",   short: "Sections" },
+    { id: "daily",      label: "Daily Routine",       short: "Routine" },
+    { id: "mocks",      label: "Mock Strategy",       short: "Mocks" },
+    { id: "milestones", label: "Milestones",          short: "Goals" },
+    { id: "resources",  label: "Resources",           short: "Resources" },
   ];
+
+  const currentWeekNum = getCurrentWeekNum(startDate);
+  const todayName = getTodayName();
+  const daysLeft = daysUntil(examDate);
 
   const syncColor = syncStatus === "saving" ? "#C8972A" : syncStatus === "saved" ? "#2AAF6F" : syncStatus === "error" ? "#E8532A" : "#333";
   const syncText = syncStatus === "saving" ? "● SYNCING..." : syncStatus === "saved" ? "✓ SAVED" : syncStatus === "error" ? "✗ SYNC ERROR" : "● CLOUD SYNC";
@@ -704,12 +765,35 @@ export default function CATPrep() {
     <div style={{ fontFamily:"'Georgia', 'Times New Roman', serif", background:"#0D0D0D", minHeight:"100vh", color:"#F0EDE8" }}>
 
       {/* Header */}
-      <div style={{ background:"linear-gradient(135deg, #0D0D0D 0%, #1A1208 50%, #0D0D0D 100%)", borderBottom:"1px solid #2A2520", padding:"40px 32px 32px", position:"relative", overflow:"hidden" }}>
+      <div style={{ background:"linear-gradient(135deg, #0D0D0D 0%, #1A1208 50%, #0D0D0D 100%)", borderBottom:"1px solid #2A2520", padding: isMobile ? "24px 16px 20px" : "40px 32px 32px", position:"relative", overflow:"hidden" }}>
         <div style={{ position:"absolute", top:0, right:0, width:"300px", height:"300px", background:"radial-gradient(circle, rgba(232,83,42,0.08) 0%, transparent 70%)", pointerEvents:"none" }} />
         <div style={{ maxWidth:"900px", margin:"0 auto" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"8px" }}>
-            <div style={{ background:"#E8532A", color:"#fff", padding:"4px 12px", fontSize:"10px", fontFamily:"monospace", letterSpacing:"3px", fontWeight:"bold" }}>CONFIDENTIAL</div>
-            <div style={{ color:"#666", fontSize:"11px", fontFamily:"monospace", letterSpacing:"2px" }}>CAT 2025 PREP SYSTEM</div>
+          <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"8px", flexWrap:"wrap" }}>
+            {/* CAT countdown */}
+            {editingExamDate ? (
+              <input autoFocus type="date" defaultValue={examDate}
+                onBlur={e => { if(e.target.value) setExamDate(e.target.value); setEditingExamDate(false); }}
+                onKeyDown={e => { if(e.key==="Enter") e.target.blur(); if(e.key==="Escape") setEditingExamDate(false); }}
+                style={{ background:"#1A1A1A", border:"1px solid #E8532A", color:"#F0EDE8", padding:"3px 8px", fontFamily:"monospace", fontSize:"11px" }} />
+            ) : (
+              <div onClick={() => setEditingExamDate(true)} title="Click to set exam date" style={{ background:"#E8532A", color:"#fff", padding:"4px 12px", fontSize:"10px", fontFamily:"monospace", letterSpacing:"3px", fontWeight:"bold", cursor:"pointer" }}>
+                {daysLeft !== null ? (daysLeft > 0 ? `${daysLeft}D TO CAT` : daysLeft === 0 ? "CAT TODAY" : "CAT DONE") : "SET EXAM DATE"}
+              </div>
+            )}
+            {/* Start date / current week */}
+            {editingStartDate ? (
+              <input autoFocus type="date" defaultValue={startDate}
+                onBlur={e => { if(e.target.value){ setStartDate(e.target.value); const wk=getCurrentWeekNum(e.target.value); if(wk) setSelectedWeek(wk); } setEditingStartDate(false); }}
+                onKeyDown={e => { if(e.key==="Enter") e.target.blur(); if(e.key==="Escape") setEditingStartDate(false); }}
+                style={{ background:"#1A1A1A", border:"1px solid #555", color:"#F0EDE8", padding:"3px 8px", fontFamily:"monospace", fontSize:"11px" }} />
+            ) : (
+              <div onClick={() => setEditingStartDate(true)} title="Click to set Day 1 start date" style={{ color:"#666", fontSize:"11px", fontFamily:"monospace", letterSpacing:"2px", cursor:"pointer" }}>
+                {currentWeekNum ? `WEEK ${currentWeekNum} OF 16` : "SET START DATE"}
+              </div>
+            )}
+            {currentStreak > 0 && (
+              <div style={{ color:"#C8972A", fontSize:"10px", fontFamily:"monospace", letterSpacing:"1px" }}>🔥 {currentStreak} DAY STREAK</div>
+            )}
             <div style={{ marginLeft:"auto", color:syncColor, fontSize:"10px", fontFamily:"monospace", letterSpacing:"1px" }}>{syncText}</div>
           </div>
           <h1 style={{ fontSize:"clamp(28px, 5vw, 48px)", fontWeight:"normal", letterSpacing:"-1px", margin:"0 0 8px", lineHeight:1.1 }}>
@@ -725,15 +809,15 @@ export default function CATPrep() {
       <div style={{ background:"#111", borderBottom:"1px solid #222", padding:"0 32px", overflowX:"auto" }}>
         <div style={{ maxWidth:"900px", margin:"0 auto", display:"flex" }}>
           {tabs.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ background:"none", border:"none", cursor:"pointer", padding:"16px 20px", fontSize:"12px", fontFamily:"'Courier New', monospace", letterSpacing:"1.5px", color: activeTab===tab.id ? "#E8532A" : "#555", borderBottom: activeTab===tab.id ? "2px solid #E8532A" : "2px solid transparent", transition:"all 0.2s", whiteSpace:"nowrap", textTransform:"uppercase" }}>
-              {tab.label}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ background:"none", border:"none", cursor:"pointer", padding: isMobile ? "12px 10px" : "16px 20px", fontSize: isMobile ? "10px" : "12px", fontFamily:"'Courier New', monospace", letterSpacing: isMobile ? "0.5px" : "1.5px", color: activeTab===tab.id ? "#E8532A" : "#555", borderBottom: activeTab===tab.id ? "2px solid #E8532A" : "2px solid transparent", transition:"all 0.2s", whiteSpace:"nowrap", textTransform:"uppercase" }}>
+              {isMobile ? tab.short : tab.label}
             </button>
           ))}
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth:"900px", margin:"0 auto", padding:"32px" }}>
+      <div style={{ maxWidth:"900px", margin:"0 auto", padding: isMobile ? "16px" : "32px" }}>
 
         {/* WEEKLY PLAN TAB */}
         {activeTab === "weekly" && (
@@ -760,7 +844,7 @@ export default function CATPrep() {
                           {w.mock.startsWith("None") ? "🚫 NO MOCK" : w.mock.startsWith("ZERO") ? "🚫 NO MOCK" : w.mock.startsWith("FIRST") ? "⚡ FIRST FULL MOCK" : w.mock.includes("Full mock") ? "📋 FULL MOCK" : "📝 SECTIONAL"}
                         </div>
                       </div>
-                      <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", borderBottom:"1px solid #1A1A1A" }}>
+                      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", borderBottom:"1px solid #1A1A1A" }}>
                         {[{ label:"QUANT", data:w.quant, color:"#4A90D9" },{ label:"VARC", data:w.varc, color:"#E8532A" },{ label:"LRDI", data:w.lrdi, color:"#C8972A" }].map((sec, j) => (
                           <div key={j} style={{ padding:"16px 18px", borderRight: j<2 ? "1px solid #1A1A1A" : "none" }}>
                             <div style={{ color:sec.color, fontSize:"10px", fontFamily:"monospace", letterSpacing:"2px", marginBottom:"10px", fontWeight:"bold" }}>{sec.label}</div>
@@ -795,8 +879,8 @@ export default function CATPrep() {
                           </div>
                         ))}
                       </div>
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr" }}>
-                        <div style={{ padding:"12px 18px", borderRight:"1px solid #1A1A1A" }}>
+                      <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}>
+                        <div style={{ padding:"12px 18px", borderRight: isMobile ? "none" : "1px solid #1A1A1A", borderBottom: isMobile ? "1px solid #1A1A1A" : "none" }}>
                           <div style={{ color:"#555", fontSize:"9px", fontFamily:"monospace", letterSpacing:"1px", marginBottom:"5px" }}>MOCK / TEST THIS WEEK</div>
                           <div style={{ color: w.mock.startsWith("None")||w.mock.startsWith("ZERO") ? "#444" : "#F0EDE8", fontSize:"12px", lineHeight:1.5 }}>{w.mock}</div>
                         </div>
@@ -830,21 +914,49 @@ export default function CATPrep() {
               <p style={{ color:"#666", fontSize:"12px", fontFamily:"monospace", marginBottom:"20px", padding:"12px", background:"#141414", borderLeft:"3px solid #E8532A" }}>
                 Select a week. Check off each task as you complete it. Progress syncs across all your devices automatically.
               </p>
+              {/* Progress / streak card */}
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap:"10px", marginBottom:"24px" }}>
+                {[
+                  { label:"CURRENT WEEK", value: currentWeekNum ? `Week ${currentWeekNum}` : "—", sub: currentWeekNum ? `of 16` : "Set start date", color:"#E8532A" },
+                  { label:"STREAK", value: currentStreak > 0 ? `${currentStreak} days` : "0 days", sub: currentStreak > 0 ? "🔥 keep going" : "check off a task", color:"#C8972A" },
+                  { label:"THIS WEEK", value: (() => { const all=days.flatMap(d=>(dailyTasks[d]||[]).map((_,ti)=>`${wData ? wData.week : selectedWeek}-${d}-${ti}`)); const done=all.filter(k=>checkedTasks[k]).length; return `${all.length ? Math.round(done/all.length*100) : 0}%`; })(), sub: "tasks complete", color:"#4A90D9" },
+                  { label:"DAYS TO CAT", value: daysLeft !== null ? (daysLeft > 0 ? daysLeft : daysLeft === 0 ? "Today!" : "Done") : "—", sub: examDate || "Click header to set", color:"#2AAF6F" },
+                ].map((card, i) => (
+                  <div key={i} style={{ background:"#141414", border:"1px solid #1E1E1E", borderTop:`2px solid ${card.color}`, padding:"14px" }}>
+                    <div style={{ color:"#555", fontSize:"8px", fontFamily:"monospace", letterSpacing:"2px", marginBottom:"6px" }}>{card.label}</div>
+                    <div style={{ color:card.color, fontSize:"22px", fontFamily:"monospace", fontWeight:"bold", lineHeight:1 }}>{card.value}</div>
+                    <div style={{ color:"#444", fontSize:"10px", marginTop:"4px" }}>{card.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Month-grouped week selector */}
               <div style={{ marginBottom:"28px" }}>
                 <div style={{ color:"#555", fontSize:"10px", fontFamily:"monospace", letterSpacing:"2px", marginBottom:"12px" }}>SELECT WEEK</div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
-                  {data.weeklyPlan.map(w => {
-                    const allKeys = days.flatMap(d => (getDailyTasks(w)[d]||[]).map((_,ti) => `${w.week}-${d}-${ti}`));
-                    const done = allKeys.filter(k => checkedTasks[k]).length;
-                    const pct = allKeys.length > 0 ? Math.round((done/allKeys.length)*100) : 0;
-                    const isSel = selectedWeek === w.week;
-                    return (
-                      <button key={w.week} onClick={() => setSelectedWeek(w.week)} style={{ background: isSel ? w.color : "#141414", border:`1px solid ${isSel ? w.color : "#2A2A2A"}`, color: isSel ? "#000" : pct===100 ? "#2AAF6F" : "#666", padding:"6px 14px", cursor:"pointer", fontFamily:"monospace", fontSize:"11px", fontWeight: isSel ? "bold" : "normal" }}>
-                        W{w.week}{pct===100 && !isSel ? " ✓" : pct>0 && pct<100 ? ` ${pct}%` : ""}
-                      </button>
-                    );
-                  })}
-                </div>
+                {["Month 1","Month 2","Month 3","Month 4"].map(month => {
+                  const monthWeeks = data.weeklyPlan.filter(w => w.month === month);
+                  const monthColor = monthWeeks[0]?.color;
+                  return (
+                    <div key={month} style={{ marginBottom:"10px", display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap" }}>
+                      <div style={{ color:monthColor, fontSize:"9px", fontFamily:"monospace", letterSpacing:"2px", width:"56px", flexShrink:0 }}>{month.toUpperCase()}</div>
+                      <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+                        {monthWeeks.map(w => {
+                          const allKeys = days.flatMap(d => (getDailyTasks(w)[d]||[]).map((_,ti) => `${w.week}-${d}-${ti}`));
+                          const done = allKeys.filter(k => checkedTasks[k]).length;
+                          const pct = allKeys.length > 0 ? Math.round((done/allKeys.length)*100) : 0;
+                          const isSel = selectedWeek === w.week;
+                          const isCurrent = currentWeekNum === w.week;
+                          return (
+                            <button key={w.week} onClick={() => setSelectedWeek(w.week)} style={{ background: isSel ? w.color : "#141414", border:`1px solid ${isSel ? w.color : isCurrent ? monthColor : "#2A2A2A"}`, color: isSel ? "#000" : pct===100 ? "#2AAF6F" : isCurrent ? monthColor : "#666", padding:"5px 12px", cursor:"pointer", fontFamily:"monospace", fontSize:"11px", fontWeight: isSel || isCurrent ? "bold" : "normal", position:"relative" }}>
+                              W{w.week}{pct===100 && !isSel ? " ✓" : pct>0 && pct<100 ? ` ${pct}%` : ""}
+                              {isCurrent && !isSel && <span style={{ position:"absolute", top:"-3px", right:"-3px", width:"6px", height:"6px", borderRadius:"50%", background:monthColor }} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               {wData && (
                 <div>
@@ -869,12 +981,14 @@ export default function CATPrep() {
                     const dc = dayColors[day];
                     const isMockD = tasks.some(t=>t.tag==="mock"&&t.activity.includes("Full mock"));
                     const isSectD = tasks.some(t=>t.tag==="mock"&&t.activity.includes("Sectional"));
+                    const isToday = day === todayName && currentWeekNum === wData.week;
                     return (
-                      <div key={day} style={{ background:"#141414", border:"1px solid #1A1A1A", borderLeft:`3px solid ${dc}`, marginBottom:"12px" }}>
+                      <div key={day} style={{ background:"#141414", border:`1px solid ${isToday ? dc+"55" : "#1A1A1A"}`, borderLeft:`3px solid ${dc}`, marginBottom:"12px" }}>
                         {/* Day header */}
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", background:"#0F0F0F", borderBottom:"1px solid #1A1A1A" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 16px", background: isToday ? "#0F0F0F" : "#0F0F0F", borderBottom:"1px solid #1A1A1A" }}>
                           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                             <span style={{ color:dc, fontFamily:"monospace", fontSize:"11px", fontWeight:"bold", letterSpacing:"2px" }}>{day.toUpperCase()}</span>
+                            {isToday && <span style={{ background:dc+"22", color:dc, fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:`1px solid ${dc}44` }}>TODAY</span>}
                             {isMockD && <span style={{ background:"#E8532A22", color:"#E8532A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #E8532A44" }}>⚡ MOCK DAY</span>}
                             {isSectD && <span style={{ background:"#C8972A22", color:"#C8972A", fontSize:"9px", fontFamily:"monospace", padding:"2px 8px", border:"1px solid #C8972A44" }}>📝 SECTIONAL</span>}
                             {isCustomOrdered && (
@@ -1029,7 +1143,7 @@ export default function CATPrep() {
                 <p style={{ color:"#AAA", fontSize:"13px", fontFamily:"monospace", marginTop:"16px", marginBottom:"16px", padding:"12px", background:"#0D0D0D", borderLeft:`2px solid ${phase.color}` }}>
                   OBJECTIVE: {phase.objective}
                 </p>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px" }}>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:"20px" }}>
                   <div>
                     <Label>Skills to Build</Label>
                     {phase.skills.map((s, j) => <BulletItem key={j} color={phase.color}>{s}</BulletItem>)}
@@ -1084,7 +1198,7 @@ export default function CATPrep() {
                   <Label style={{ marginBottom:"6px" }}>Daily Practice Target</Label>
                   <p style={{ margin:0, color:"#F0EDE8", fontSize:"13px", fontFamily:"monospace" }}>{sec.daily}</p>
                 </div>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"20px" }}>
+                <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:"20px" }}>
                   <div>
                     <Label>Common Mistakes to Avoid</Label>
                     {sec.mistakes.map((m, j) => (
@@ -1103,7 +1217,7 @@ export default function CATPrep() {
             ))}
             <div style={{ background:"#141414", border:"1px solid #222", padding:"28px" }}>
               <SectionTitle style={{ marginTop:0 }}>Daily Targets & Difficulty Progression</SectionTitle>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:"16px" }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap:"16px" }}>
                 {[
                   { phase:"Month 1", varc:"3 RCs + 10 VA Qs", lrdi:"2 sets (untimed)", quant:"20 Qs (70% medium)", color:"#E8532A" },
                   { phase:"Month 2", varc:"3 RCs (timed) + 15 VA Qs", lrdi:"2–3 sets (timed)", quant:"20 Qs (50% hard)", color:"#C8972A" },
@@ -1169,7 +1283,7 @@ export default function CATPrep() {
             <div style={{ background:"#141414", border:"1px solid #2A2520", padding:"28px", marginTop:"24px" }}>
               <SectionTitle style={{ marginTop:0 }}>The Error Log System (Non-Negotiable)</SectionTitle>
               <p style={{ color:"#888", fontSize:"12px", fontFamily:"monospace", marginBottom:"20px" }}>Maintain a Google Sheet with the following columns for every wrong question:</p>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:"12px" }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap:"12px" }}>
                 {[{col:"Date",desc:"When you got it wrong"},{col:"Section",desc:"VARC / LRDI / Quant"},{col:"Topic",desc:"Specific sub-topic"},{col:"Error Type",desc:"Concept / Calc / Careless / Time"},{col:"Correct Approach",desc:"2-line explanation of right method"},{col:"Re-attempt date",desc:"Redo after 5–7 days cold"}].map((col, i) => (
                   <div key={i} style={{ background:"#0D0D0D", padding:"14px", borderTop:"2px solid #E8532A" }}>
                     <div style={{ color:"#E8532A", fontSize:"11px", fontFamily:"monospace", marginBottom:"6px" }}>{col.col}</div>
@@ -1195,7 +1309,7 @@ export default function CATPrep() {
                   <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px" }}>
                     <div style={{ background:c, color:"#fff", padding:"4px 14px", fontSize:"11px", fontFamily:"monospace", letterSpacing:"2px" }}>{m.month}</div>
                   </div>
-                  <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:"16px" }}>
+                  <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap:"16px" }}>
                     {[{label:"VARC",value:m.varc,color:"#E8532A"},{label:"LRDI",value:m.lrdi,color:"#C8972A"},{label:"Quant",value:m.quant,color:"#4A90D9"},{label:"Overall Mock",value:m.overall,color:c}].map((item, j) => (
                       <div key={j} style={{ background:"#0D0D0D", padding:"14px", borderTop:`2px solid ${item.color}` }}>
                         <div style={{ color:item.color, fontSize:"10px", fontFamily:"monospace", letterSpacing:"2px", marginBottom:"6px" }}>{item.label}</div>
